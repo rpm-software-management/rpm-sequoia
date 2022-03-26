@@ -1,0 +1,8 @@
+[target.'cfg(all())']
+# Note: if the RUSTFLAGS environment variable is set, this will be
+# ignored.
+rustflags = [
+          "-Dwarnings",
+          "-Aunused-parens",
+          "-Aunused-macros",
+]

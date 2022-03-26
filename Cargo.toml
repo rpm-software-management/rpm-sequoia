@@ -1,0 +1,35 @@
+[package]
+name = "rpm-sequoia"
+description = "An implementation of the RPM PGP interface using Sequoia."
+version = "0.1.0"
+authors = ["Neal H. Walfield <neal@pep.foundation>"]
+homepage = "https://sequoia-pgp.org/"
+repository = "https://gitlab.com/sequoia-pgp/rpm-sequoia"
+readme = "README.md"
+keywords = ["cryptography", "openpgp", "pgp", "signing"]
+categories = ["cryptography", "authentication"]
+license = "LGPL-2.0-or-later"
+edition = "2021"
+build = "build.rs"
+
+[badges]
+maintenance = { status = "actively-developed" }
+gitlab = { repository = "sequoia-pgp/rpm-sequoia" }
+
+[dependencies]
+anyhow = "1"
+buffered-reader = "1"
+lazy_static = "1"
+libc = "0.2"
+sequoia-openpgp = { version = "1.8", default-features = false }
+thiserror = "1"
+
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+default = [
+    "sequoia-openpgp/default",
+]
+crypto-nettle = ["sequoia-openpgp/crypto-nettle"]
+crypto-cng = ["sequoia-openpgp/crypto-cng"]
