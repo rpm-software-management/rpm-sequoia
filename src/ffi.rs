@@ -123,6 +123,7 @@ macro_rules! ffi {
     {
         // The wrapper.  It calls $f and turns the result into an
         // error code.
+        #[allow(unused)]
         #[no_mangle] pub extern "C"
         fn $f($($v: $t),*) -> $Crt {
             tracer!(*crate::TRACE, stringify!($f));
