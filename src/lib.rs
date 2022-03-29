@@ -7,6 +7,7 @@ use std::io::Read;
 use std::io::Write;
 use std::time::{
     Duration,
+    SystemTime,
     UNIX_EPOCH,
 };
 
@@ -989,4 +990,162 @@ ffi!(fn pgpParsePkts(armor: *const c_char,
     std::mem::forget(buf);
 
     Ok(kind.into())
+});
+
+// Lints the first certificate in pkts.
+ffi!(fn pgpPubkeyLint(pkts: *const c_char,
+                      pktslen: size_t,
+                      explanation: *mut *mut c_char) -> ErrorCode
+{
+    let pkts = check_slice!(pkts, pktslen);
+    let explanation = check_mut!(explanation);
+
+    // Make sure we always set explanation to something.
+    *explanation = std::ptr::null_mut();
+
+    let cert = CertParser::from_bytes(pkts)?.next()
+        .ok_or(Error::Fail("Not an OpenPGP certificate".into()))??;
+
+    let mut lints: Vec<String> = Vec::new();
+    let mut lint = |l: &str| {
+        lints.push(l.into());
+    };
+
+    let usable = 'done : loop {
+        match cert.with_policy(P, None) {
+            Err(err) => {
+                lint(&format!("Policy rejects {}: {}", cert.keyid(), err));
+                break 'done false;
+            }
+            Ok(vc) => {
+                if let RevocationStatus::Revoked(revs)
+                    = vc.revocation_status()
+                {
+                    for rev in revs {
+                        if let Some((reason, msg))
+                            = rev.reason_for_revocation()
+                        {
+                            let mut l = format!(
+                                "The certificate was revoked: {}", reason);
+                            if ! msg.is_empty() {
+                                l.push_str(&format!(
+                                    ", {}",
+                                    String::from_utf8_lossy(msg)));
+                            }
+                            lint(&l);
+                        } else {
+                            lint("The certificate was revoked: \
+                                  unspecified reason");
+                        }
+                    }
+                    break 'done false;
+                }
+
+                if let Err(err) = vc.alive() {
+                    if let Some(e) = vc.primary_key().key_expiration_time() {
+                        if e <= SystemTime::now() {
+                            lint(&format!("The certificate is expired: {}",
+                                          err));
+                        } else {
+                            lint(&format!("The certificate is not live: {}",
+                                          err));
+                        }
+                    }
+                    break 'done false;
+                }
+            }
+        };
+
+        let mut have_signing = false;
+        for ka in cert.keys() {
+            let keyid = ka.keyid();
+
+            match ka.with_policy(P, None) {
+                Err(err) => {
+                    lint(&format!("Policy rejects subkey {}: {}",
+                                  keyid, err));
+                    continue;
+                }
+                Ok(ka) => {
+                    if ! ka.for_signing() {
+                        continue;
+                    }
+
+                    if let RevocationStatus::Revoked(revs)
+                        = ka.revocation_status()
+                    {
+                        for rev in revs {
+                            if let Some((reason, msg))
+                                = rev.reason_for_revocation()
+                            {
+                                let mut l = format!(
+                                    "Subkey {} was revoked: {}",
+                                    keyid, reason);
+                                if ! msg.is_empty() {
+                                    l.push_str(&format!(
+                                        ", {}",
+                                        String::from_utf8_lossy(msg)));
+                                }
+                                lint(&l);
+                            } else {
+                                lint(&format!(
+                                    "Subkey {} was revoked: \
+                                     unspecified reason",
+                                    keyid));
+                            }
+                        }
+                        continue;
+                    }
+
+                    if let Err(err) = ka.alive() {
+                        if let Some(e) = ka.key_expiration_time() {
+                            if e <= SystemTime::now() {
+                                lint(&format!("Subkey {} is expired: {}",
+                                              keyid, err));
+                            } else {
+                                lint(&format!("Subkey {} is not live: {}",
+                                              keyid, err));
+                            }
+                        }
+                        continue;
+                    }
+
+                    if ! ka.pk_algo().is_supported() {
+                        lint(&format!("Subkey {} is not supported \
+                                       (no support for {})",
+                                      keyid,
+                                      ka.pk_algo()));
+                        continue;
+                    }
+
+                    have_signing = true;
+                }
+            }
+        }
+
+        if ! have_signing {
+            lint("Certificate does not have any usable signing keys");
+        }
+
+        break true;
+    };
+
+    if ! lints.is_empty() {
+        // Indent the lints.
+        let sep = "\n  ";
+
+        let mut s: String = format!("Certificate {}:{}", cert.keyid(), sep);
+        s.push_str(&lints.join(sep));
+        s.push('\0');
+
+        *explanation = s.as_mut_ptr() as *mut c_char;
+        // Pass ownership to the caller.
+        std::mem::forget(s);
+    }
+
+    if usable {
+        Ok(())
+    } else {
+        Err(Error::Fail(format!("Certificate {} is unusable", cert.keyid())))
+    }
 });
