@@ -821,12 +821,26 @@ ffi!(fn pgpPrtParams(pkts: *const u8, pktlen: size_t,
 
     let ppr = PacketParser::from_bytes(pkts)?;
 
-    let (obj, issuer, userid) = if let PacketParserResult::Some(ref pp) = ppr {
+    let (obj, issuer, userid) = if let PacketParserResult::Some(pp) = ppr {
         // Process the packet.
         match pp.packet {
-            Packet::Signature(ref sig)
+            Packet::Signature(_)
                 if pkttype.is_none() || pkttype == Some(Tag::Signature) =>
             {
+                let (packet, next_ppr) = pp.next()?;
+
+                if let PacketParserResult::Some(p) = next_ppr {
+                    return Err(Error::Fail(
+                        format!("Expected a bare signature, got a trailing {}",
+                                p.packet.tag())));
+                }
+
+                let sig = if let Packet::Signature(sig) = packet {
+                    sig
+                } else {
+                    panic!("it's a sig");
+                };
+
                 (PgpDigParamsObj::Signature(sig.clone()),
                  // XXX: Although there is normally only one issuer
                  // subpacket, there may be multiple such subpackets.
@@ -841,7 +855,7 @@ ffi!(fn pgpPrtParams(pkts: *const u8, pktlen: size_t,
                     || pkttype == Some(Tag::PublicKey)
                     || pkttype == Some(Tag::SecretKey) =>
             {
-                let cert = CertParser::from(ppr)
+                let cert = CertParser::from(PacketParserResult::Some(pp))
                     .next()
                     .ok_or(Error::Fail("Not an OpenPGP message".into()))??;
 
