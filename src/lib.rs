@@ -338,7 +338,7 @@ ffi!(fn pgpDigParamsVersion(dig: *const PgpDigParams) -> c_int[0] {
 //
 // If `dig` is a subkey, then this returns the subkey's key creation
 // time.
-ffi!(fn pgpDigParamsTime(dig: *const PgpDigParams) -> u32[0] {
+ffi!(fn pgpDigParamsCreationTime(dig: *const PgpDigParams) -> u32[0] {
     let dig = check_ptr!(dig);
     let t = match &dig.obj {
         PgpDigParamsObj::Cert(cert) => {
