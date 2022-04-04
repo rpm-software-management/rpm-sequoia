@@ -1,0 +1,141 @@
+# Only ever create pipelines for tags or branches.
+# Avoid creation of detached pipelines for merge requests.
+workflow:
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH
+
+stages:
+  - lint
+  - test
+  - deploy
+
+# These stanzas do some common management tasks before and after the
+# job-specific before_script and after_script stanzas are run.
+# before_script_start configures any default global state.  The
+# job-specific before_script can override this state, if required.
+# before_script_end prints out information about the environment to
+# improve debugging; it does not modify the environment.
+# after_script_end does some common management tasks after the
+# job-specific after_script is run.  It prints information about the
+# environment, and does some clean up.
+#
+# Add this to your stanza as follows:
+#
+#   before_script:
+#     - *before_script_start
+#     - *** YOUR CODE HERE ***
+#     - *before_script_end
+#   after_script:
+#     - *** YOUR CODE HERE ***
+#     - *after_script_end
+
+.before_script_start: &before_script_start
+  - 'if test "x${RUSTFLAGS+SET}" = xSET; then echo "\$RUSTFLAGS is set ($RUSTFLAGS)"; exit 1; fi'
+
+.before_script_end: &before_script_end
+  - 'if test "x${RUSTFLAGS+SET}" = xSET; then echo "WARNING: before_script set \$RUSTFLAGS ($RUSTFLAGS)"; fi'
+  - rustc --version --verbose
+  - cargo --version
+  - clang -v
+  - if [ -d $CARGO_TARGET_DIR ]; then find $CARGO_TARGET_DIR | wc --lines; du -sh $CARGO_TARGET_DIR; fi
+  - if [ -d $CARGO_HOME ]; then find $CARGO_HOME | wc --lines; du -sh $CARGO_HOME; fi
+
+.after_script_end: &after_script_end
+  - if [ -d $CARGO_TARGET_DIR ]; then du -sh $CARGO_TARGET_DIR; fi
+  - if [ -d $CARGO_HOME ]; then du -sh $CARGO_HOME; fi
+
+before_script:
+  - *before_script_start
+  - *before_script_end
+
+after_script:
+  - *after_script_end
+
+cache: &general_cache_config
+  # default key is default
+  # default policy is pull-push
+  paths:
+    - $CARGO_TARGET_DIR
+    - $CARGO_HOME
+
+.rust-stable:
+  image: registry.gitlab.com/sequoia-pgp/build-docker-image/rust-stable:latest
+  before_script:
+    - *before_script_start
+    - *before_script_end
+  after_script:
+    - *after_script_end
+  cache:
+    # inherit all general cache settings
+    <<: *general_cache_config
+    # override the key
+    key: "rust-stable"
+
+.bookworm:
+  image: registry.gitlab.com/sequoia-pgp/build-docker-image/bookworm:latest
+  before_script:
+    - *before_script_start
+    - *before_script_end
+  after_script:
+    - *after_script_end
+  cache:
+    # inherit all general cache settings
+    <<: *general_cache_config
+    # override the key
+    key: "bookworm"
+
+codespell:
+  stage: lint
+  extends: .bookworm
+
+  before_script:
+    - *before_script_start
+    - codespell --version
+    - *before_script_end
+  script:
+    - codespell --config .codespellrc --summary
+  after_script: []
+
+# Disabled, because our code triggers an ICE in rustc 1.57+
+# https://github.com/rust-lang/rust/issues/95406
+
+# test-bookworm:
+#   stage: test
+#   extends: .bookworm
+#   script:
+#     - cargo test --all
+
+test-rust-stable:
+  stage: test
+  extends: .rust-stable
+  script:
+    - cargo test --all
+
+deny:
+  stage: lint
+  extends: .rust-stable
+  script:
+    - cargo deny check
+  rules:
+    - if: '$CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
+      when: manual
+      allow_failure: true
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      allow_failure: false
+  cache: []
+
+all_commits:
+  # Test each commit up to main, to facilitate bisecting.
+  stage: test
+  extends: .rust-stable
+  script:
+    - .ci/all_commits.sh
+  variables:
+    GIT_STRATEGY: clone
+
+variables:
+  CARGO_HOME: cargo/
+  CARGO_FLAGS: --color always
+  CARGO_INCREMENTAL: 0
+  CARGO_TARGET_DIR: target/

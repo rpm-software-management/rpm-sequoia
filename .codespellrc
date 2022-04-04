@@ -1,0 +1,3 @@
+[codespell]
+skip = *.bin,*.gpg,*.pgp,./.git,data,highlight.js,*/target,Makefile,*.html,*/cargo,*.xml,*.xmlv2,
+ignore-words-list = crate,ede,iff,mut,nd,te,uint,KeyServer,keyserver,Keyserver,keyservers,Keyservers,keypair,keypairs,KeyPair,fpr,dedup,ba,
