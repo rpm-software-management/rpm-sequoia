@@ -817,6 +817,7 @@ ffi!(fn pgpPrtParams(pkts: *const u8, pktlen: size_t,
 
     let pkts = check_slice!(pkts, pktlen);
     let paramsp = check_mut!(paramsp);
+    *paramsp = std::ptr::null_mut();
 
     let ppr = PacketParser::from_bytes(pkts)?;
 
@@ -899,6 +900,7 @@ ffi!(fn pgpPrtParamsSubkeys(pkts: *const u8, pktlen: size_t,
                             subkeys_count: *mut c_int) -> Binary {
     let pkts = check_slice!(pkts, pktlen);
     let subkeys = check_mut!(subkeys);
+    *subkeys = std::ptr::null_mut();
     let subkeys_count = check_mut!(subkeys_count);
 
     let ppr = PacketParser::from_bytes(pkts)?;
@@ -972,6 +974,7 @@ ffi!(fn pgpParsePkts(armor: *const c_char,
 {
     let armor = check_cstr!(armor);
     let pkt = check_mut!(pkt);
+    *pkt = std::ptr::null_mut();
     let pktlen = check_mut!(pktlen);
 
     let mut reader = armor::Reader::new(
