@@ -1,3 +1,8 @@
+pub(crate) fn idempotent<T>(x: T) -> T { x }
+pub(crate) fn zero<T>(_: T) -> libc::c_int { 0 }
+pub(crate) fn minus_one<T>(_: T) -> libc::c_int { -1 }
+pub(crate) fn unit<T>(_: T) -> () { () }
+
 // Wraps an ffi function, which returns an arbitrary type.
 //
 // The inner function returns `Result<$rt>`.  This wrapper maps
@@ -10,8 +15,8 @@ macro_rules! ffi {
         ffi!(fn $f($($v: $t),*)
                    -> Result<(), crate::Error>
                    -> (crate::ErrorCode;
-                       |_| 0;
-                       |_err| -1)
+                       $crate::ffi::zero;
+                       $crate::ffi::minus_one)
              {
                  $body
              });
@@ -23,7 +28,7 @@ macro_rules! ffi {
         ffi!(fn $f($($v: $t),*)
                    -> Result<(), crate::Error>
                    -> (crate::ErrorCode;
-                       |_| 0;
+                       $crate::ffi::zero;
                        |err| crate::ErrorCode::from(err))
              {
                  $body
@@ -36,11 +41,8 @@ macro_rules! ffi {
         ffi!(fn $f($($v: $t),*)
                    -> Result<crate::rpm::PgpArmor, crate::rpm::PgpArmorError>
                    -> (crate::ErrorCode;
-                       |v: crate::rpm::PgpArmor| {
-                           t!("-> {:?}", v);
-                           v.into()
-                       };
-                       |err: crate::rpm::PgpArmorError| err.into())
+                       c_int::from;
+                       c_int::from)
              {
                  $body
              });
@@ -53,7 +55,7 @@ macro_rules! ffi {
         ffi!(fn $f($($v: $t),*)
                    -> Result<*const $value, crate::Error>
                    -> (*const $value;
-                       |v| v;
+                       $crate::ffi::idempotent;
                        |_| std::ptr::null())
              {
                  $body
@@ -67,7 +69,7 @@ macro_rules! ffi {
         ffi!(fn $f($($v: $t),*)
                    -> Result<*mut $value, crate::Error>
                    -> (*mut $value;
-                       |v| v;
+                       $crate::ffi::idempotent;
                        |_| std::ptr::null_mut())
              {
                  $body
@@ -81,10 +83,7 @@ macro_rules! ffi {
         ffi!(fn $f($($v: $t),*)
                    -> Result<$value, crate::Error>
                    -> ($value;
-                       |v| {
-                           t!(" -> {:?}", v);
-                           v
-                       };
+                       $crate::ffi::idempotent;
                        |_| $err)
              {
                  $body
@@ -101,8 +100,8 @@ macro_rules! ffi {
         ffi!(fn $f($($v: $t),*)
              -> Result<(), crate::Error>
              -> (();
-                 |_| ();
-                 |_| ())
+                 $crate::ffi::unit;
+                 $crate::ffi::unit)
              {
                  let () = $body;
                  Ok(())
