@@ -109,6 +109,10 @@ ffi!(fn rpmDigestUpdate(ctx: *mut DigestContext,
 ffi!(fn rpmDigestFinal(ctx: *mut DigestContext,
                        datap: *mut *mut u8, lenp: *mut size_t,
                        as_ascii: c_int) -> Binary {
+    if ctx.is_null() {
+        return Ok(());
+    }
+
     let ctx = claim_from_c!(ctx);
     let datap = check_optional_mut!(datap);
     let lenp = check_optional_mut!(lenp);
