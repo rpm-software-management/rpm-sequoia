@@ -58,28 +58,18 @@ macro_rules! ffi {
         #[no_mangle] pub extern "C"
         fn $f($($v: $t),*) -> $Crt {
             // The actual function.
-            fn inner($($v: $t),*) -> std::result::Result<$rt, $et> { $body }
+            let inner = |$($v: $t),*| -> std::result::Result<$rt, $et> { $body };
 
-            // We use AssertUnwindSafe.  This is safe, because if we
-            // catch a panic, we abort.  If we turn the panic into an
-            // error, then we need to reexamine this assumption.
-            let r = std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
-                match inner($($v,)*) {
-                    Ok(v) => {
-                        let rt: $Crt = $rt_to_crt(v);
-                        rt
-                    }
-                    Err(err) => {
-
-                        let rt: $Crt = $err_to_crt(err);
-                        rt
-                    }
+            match inner($($v,)*) {
+                Ok(v) => {
+                    // XXX: Replace this line with a panic! and the ICE goes away.
+                    let rt: $Crt = $rt_to_crt(v);
+                    rt
+                    // panic!();
                 }
-            }));
-            match r {
-                Ok(code) => code,
-                Err(_) => {
-                    unsafe { ::libc::abort() };
+                Err(err) => {
+                    let rt: $Crt = $err_to_crt(err);
+                    rt
                 }
             }
         }
