@@ -10,9 +10,11 @@ pub(crate) fn unit<T>(_: T) -> () { () }
 // `$err_to_crt`.
 macro_rules! ffi {
     // Wraps an ffi function, which returns 0 on success and -1 on error.
-    (fn $f:ident($($v:ident: $t:ty),*) -> Binary $body:block) =>
+    ($(#[$outer:meta])*
+     fn $f:ident($($v:ident: $t:ty),*) -> Binary $body:block) =>
     {
-        ffi!(fn $f($($v: $t),*)
+        ffi!($(#[$outer])*
+             fn $f($($v: $t),*)
                    -> Result<(), crate::Error>
                    -> (crate::ErrorCode;
                        $crate::ffi::zero;
@@ -23,9 +25,11 @@ macro_rules! ffi {
     };
 
     // Wraps an ffi function, which returns an RC.
-    (fn $f:ident($($v:ident: $t:ty),*) -> ErrorCode $body:block) =>
+    ($(#[$outer:meta])*
+     fn $f:ident($($v:ident: $t:ty),*) -> ErrorCode $body:block) =>
     {
-        ffi!(fn $f($($v: $t),*)
+        ffi!($(#[$outer])*
+             fn $f($($v: $t),*)
                    -> Result<(), crate::Error>
                    -> (crate::ErrorCode;
                        $crate::ffi::zero;
@@ -36,9 +40,11 @@ macro_rules! ffi {
     };
 
     // Wraps an ffi function, which returns a PgpArmorError.
-    (fn $f:ident($($v:ident: $t:ty),*) -> PgpArmor $body:block) =>
+    ($(#[$outer:meta])*
+     fn $f:ident($($v:ident: $t:ty),*) -> PgpArmor $body:block) =>
     {
-        ffi!(fn $f($($v: $t),*)
+        ffi!($(#[$outer])*
+             fn $f($($v: $t),*)
                    -> Result<crate::rpm::PgpArmor, crate::rpm::PgpArmorError>
                    -> (crate::ErrorCode;
                        c_int::from;
@@ -50,9 +56,11 @@ macro_rules! ffi {
 
     // Wraps an ffi function, which returns an object whose type is
     // *const T.  Returns NULL on error.
-    (fn $f:ident($($v:ident: $t:ty),*) -> *const $value:ty $body:block) =>
+    ($(#[$outer:meta])*
+     fn $f:ident($($v:ident: $t:ty),*) -> *const $value:ty $body:block) =>
     {
-        ffi!(fn $f($($v: $t),*)
+        ffi!($(#[$outer])*
+             fn $f($($v: $t),*)
                    -> Result<*const $value, crate::Error>
                    -> (*const $value;
                        $crate::ffi::idempotent;
@@ -64,9 +72,11 @@ macro_rules! ffi {
 
     // Wraps an ffi function, which returns an object whose type is
     // *mut T.  Returns NULL on error.
-    (fn $f:ident($($v:ident: $t:ty),*) -> *mut $value:ty $body:block) =>
+    ($(#[$outer:meta])*
+     fn $f:ident($($v:ident: $t:ty),*) -> *mut $value:ty $body:block) =>
     {
-        ffi!(fn $f($($v: $t),*)
+        ffi!($(#[$outer])*
+             fn $f($($v: $t),*)
                    -> Result<*mut $value, crate::Error>
                    -> (*mut $value;
                        $crate::ffi::idempotent;
@@ -78,9 +88,11 @@ macro_rules! ffi {
 
     // Wraps an ffi function, which returns a value.  The value is passed
     // through as is and errors are mapped to `$err`.
-    (fn $f:ident($($v:ident: $t:ty),*) -> $value:ty[$err:expr] $body:block) =>
+    ($(#[$outer:meta])*
+     fn $f:ident($($v:ident: $t:ty),*) -> $value:ty[$err:expr] $body:block) =>
     {
-        ffi!(fn $f($($v: $t),*)
+        ffi!($(#[$outer])*
+             fn $f($($v: $t),*)
                    -> Result<$value, crate::Error>
                    -> ($value;
                        $crate::ffi::idempotent;
@@ -95,9 +107,12 @@ macro_rules! ffi {
     // The inner function returns `Result<()>` and this is mapped to `()`.
     //
     // Note: inner body returns Ok(()) by default.
-    (fn $f:ident($($v:ident: $t:ty),*) $body:block) =>
+    ($(#[$outer:meta])*
+     fn $f:ident($($v:ident: $t:ty),*) $body:block) =>
     {
-        ffi!(fn $f($($v: $t),*)
+        ffi!(
+            $(#[$outer])*
+            fn $f($($v: $t),*)
              -> Result<(), crate::Error>
              -> (();
                  $crate::ffi::unit;
@@ -114,7 +129,8 @@ macro_rules! ffi {
     // $Crt::from($rt).
     //
     // $ok is the value (of type $rt) to map Ok to.
-    (fn $f:ident($($v:ident: $t:ty),*)
+    ($(#[$outer:meta])*
+     fn $f:ident($($v:ident: $t:ty),*)
         -> Result<$rt:ty, $et:ty>
         -> ($Crt:ty; $rt_to_crt:expr; $err_to_crt: expr)
         $body:block
@@ -122,6 +138,7 @@ macro_rules! ffi {
     {
         // The wrapper.  It calls $f and turns the result into an
         // error code.
+        $(#[$outer])*
         #[allow(unused)]
         #[no_mangle] pub extern "C"
         fn $f($($v: $t),*) -> $Crt {

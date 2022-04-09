@@ -130,11 +130,12 @@ impl PgpDigParams {
     }
 }
 
-// Returns the signature's type.
-//
-// If `dig` is NULL or does not contain a signature, then this
-// function returns -1.
-ffi!(fn pgpSignatureType(dig: *const PgpDigParams) -> c_int[-1] {
+ffi!(
+/// Returns the signature's type.
+///
+/// If `dig` is NULL or does not contain a signature, then this
+/// function returns -1.
+fn pgpSignatureType(dig: *const PgpDigParams) -> c_int[-1] {
     let dig = check_ptr!(dig);
 
     dig.signature()
@@ -144,30 +145,31 @@ ffi!(fn pgpSignatureType(dig: *const PgpDigParams) -> c_int[-1] {
         })
 });
 
-// This technically returns void, but returning an error to C will be
-// fine.
-ffi!(fn pgpDigParamsFree(dig: Option<&mut PgpDigParams>) {
+ffi!(
+/// Frees the parameters.
+fn pgpDigParamsFree(dig: Option<&mut PgpDigParams>) {
     free!(dig);
 });
 
-// "Compares" the two parameters and returns 1 if they differ and 0 if
-// they match.
-//
-// Two signatures are considered the same if they have the same
-// parameters (version, signature type, public key and hash
-// algorithms, and the first issuer packet).  Note: this function
-// explicitly does not check that the MPIs are the same, nor that the
-// signature creation time is the same!  This is intended.  The only
-// use of this function in the rpm code base is to check whether a key
-// has already made a signature (cf. sign/rpmgensig.c:haveSignature).
-//
-// Two certificates are considered the same if they have the same
-// fingerprint.  (rpm does not currently use this functionality.)
-//
-// Two subkeys are considered the same if they have the same
-// fingerprint.  (rpm does not currently use this functionality.)
-ffi!(fn pgpDigParamsCmp(p1: *const PgpDigParams,
-                        p2: *const PgpDigParams)
+ffi!(
+/// "Compares" the two parameters and returns 1 if they differ and 0 if
+/// they match.
+///
+/// Two signatures are considered the same if they have the same
+/// parameters (version, signature type, public key and hash
+/// algorithms, and the first issuer packet).  Note: this function
+/// explicitly does not check that the MPIs are the same, nor that the
+/// signature creation time is the same!  This is intended.  The only
+/// use of this function in the rpm code base is to check whether a key
+/// has already made a signature (cf. sign/rpmgensig.c:haveSignature).
+///
+/// Two certificates are considered the same if they have the same
+/// fingerprint.  (rpm does not currently use this functionality.)
+///
+/// Two subkeys are considered the same if they have the same
+/// fingerprint.  (rpm does not currently use this functionality.)
+fn pgpDigParamsCmp(p1: *const PgpDigParams,
+                   p2: *const PgpDigParams)
      -> c_int[1]
 {
     let p1 = check_ptr!(p1);
@@ -200,13 +202,15 @@ ffi!(fn pgpDigParamsCmp(p1: *const PgpDigParams,
 const PGPVAL_PUBKEYALGO: c_uint = 6;
 const PGPVAL_HASHALGO: c_uint = 9;
 
-// Returns the object's public key or algorithm algorithm.
-//
-// `algotype` is either `PGPVAL_PUBKEYALGO` or `PGPVAL_HASHALGO`.
-// Other algo types are not support and cause this function to return
-// 0.
-ffi!(fn pgpDigParamsAlgo(dig: *const PgpDigParams,
-                         algotype: c_uint) -> c_uint[0] {
+ffi!(
+/// Returns the object's public key or algorithm algorithm.
+///
+/// `algotype` is either `PGPVAL_PUBKEYALGO` or `PGPVAL_HASHALGO`.
+/// Other algo types are not support and cause this function to return
+/// 0.
+fn pgpDigParamsAlgo(dig: *const PgpDigParams,
+                    algotype: c_uint) -> c_uint[0]
+{
     let dig = check_ptr!(dig);
 
     match (algotype, &dig.obj) {
@@ -260,33 +264,35 @@ ffi!(fn pgpDigParamsAlgo(dig: *const PgpDigParams,
     }
 });
 
-// Returns the issuer or the Key ID.
-//
-// If `dig` is a signature, then this returns the Key ID stored in the
-// first Issuer or Issuer Fingerprint subpacket as a hex string.
-// (This is not authenticated.)
-//
-// If `dig` is a certificate or a subkey, then this returns the key's
-// Key ID.
-//
-// The caller must not free the returned buffer.
-ffi!(fn pgpDigParamsSignID(dig: *const PgpDigParams) -> *const u8 {
+ffi!(
+/// Returns the issuer or the Key ID.
+///
+/// If `dig` is a signature, then this returns the Key ID stored in the
+/// first Issuer or Issuer Fingerprint subpacket as a hex string.
+/// (This is not authenticated.)
+///
+/// If `dig` is a certificate or a subkey, then this returns the key's
+/// Key ID.
+///
+/// The caller must not free the returned buffer.
+fn pgpDigParamsSignID(dig: *const PgpDigParams) -> *const u8 {
     let dig = check_ptr!(dig);
     Ok(dig.signid.as_ptr())
 });
 
-// Returns the primary User ID, if any.
-//
-// If `dig` is a signature, then this returns NULL.
-//
-// If `dig` is a certificate or a subkey, then this returns the
-// certificate's primary User ID, if any.
-//
-// This interface does not provide a way for the caller to recognize
-// any embedded NUL characters.
-//
-// The caller must not free the returned buffer.
-ffi!(fn pgpDigParamsUserID(dig: *const PgpDigParams) -> *const c_char {
+ffi!(
+/// Returns the primary User ID, if any.
+///
+/// If `dig` is a signature, then this returns NULL.
+///
+/// If `dig` is a certificate or a subkey, then this returns the
+/// certificate's primary User ID, if any.
+///
+/// This interface does not provide a way for the caller to recognize
+/// any embedded NUL characters.
+///
+/// The caller must not free the returned buffer.
+fn pgpDigParamsUserID(dig: *const PgpDigParams) -> *const c_char {
     let dig = check_ptr!(dig);
     if let Some(ref userid) = dig.userid {
         Ok(userid.as_ptr())
@@ -295,17 +301,18 @@ ffi!(fn pgpDigParamsUserID(dig: *const PgpDigParams) -> *const c_char {
     }
 });
 
-// Returns the object's version.
-//
-// If `dig` is a signature, then this returns the version of the
-// signature packet.
-//
-// If `dig` is a certificate, then this returns the version of the
-// primary key packet.
-//
-// If `dig` is a subkey, then this returns the version of the subkey's
-// key packet.
-ffi!(fn pgpDigParamsVersion(dig: *const PgpDigParams) -> c_int[0] {
+ffi!(
+/// Returns the object's version.
+///
+/// If `dig` is a signature, then this returns the version of the
+/// signature packet.
+///
+/// If `dig` is a certificate, then this returns the version of the
+/// primary key packet.
+///
+/// If `dig` is a subkey, then this returns the version of the subkey's
+/// key packet.
+fn pgpDigParamsVersion(dig: *const PgpDigParams) -> c_int[0] {
     let dig = check_ptr!(dig);
     let version = match &dig.obj {
         PgpDigParamsObj::Cert(cert) => {
@@ -321,17 +328,18 @@ ffi!(fn pgpDigParamsVersion(dig: *const PgpDigParams) -> c_int[0] {
     Ok(version as c_int)
 });
 
-// Returns the object's time.
-//
-// If `dig` is a signature, then this returns the signature's creation
-// time.
-//
-// If `dig` is a certificate, then this returns the primary key's key
-// creation time.
-//
-// If `dig` is a subkey, then this returns the subkey's key creation
-// time.
-ffi!(fn pgpDigParamsCreationTime(dig: *const PgpDigParams) -> u32[0] {
+ffi!(
+/// Returns the object's time.
+///
+/// If `dig` is a signature, then this returns the signature's creation
+/// time.
+///
+/// If `dig` is a certificate, then this returns the primary key's key
+/// creation time.
+///
+/// If `dig` is a subkey, then this returns the subkey's key creation
+/// time.
+fn pgpDigParamsCreationTime(dig: *const PgpDigParams) -> u32[0] {
     let dig = check_ptr!(dig);
     let t = match &dig.obj {
         PgpDigParamsObj::Cert(cert) => {
@@ -353,13 +361,14 @@ ffi!(fn pgpDigParamsCreationTime(dig: *const PgpDigParams) -> u32[0] {
        .as_secs() as u32)
 });
 
-// Returns the signature's hash prefix as a big endian 16-bit number.
-//
-// The hash prefix is the first (most significant) two bytes of the
-// signature's hash.  This function returns those two bytes.
-//
-// If `dig` is not a signature, then this returns 0.
-ffi!(fn pgpDigParamsHashPrefix(dig: *const PgpDigParams) -> u16[0] {
+ffi!(
+/// Returns the signature's hash prefix as a big endian 16-bit number.
+///
+/// The hash prefix is the first (most significant) two bytes of the
+/// signature's hash.  This function returns those two bytes.
+///
+/// If `dig` is not a signature, then this returns 0.
+fn pgpDigParamsHashPrefix(dig: *const PgpDigParams) -> u16[0] {
     let dig = check_ptr!(dig);
     let p = match &dig.obj {
         PgpDigParamsObj::Cert(_cert) => {
@@ -376,43 +385,44 @@ ffi!(fn pgpDigParamsHashPrefix(dig: *const PgpDigParams) -> u16[0] {
     Ok(p)
 });
 
-// Verifies the signature.
-//
-// If `key` is NULL, then this computes the hash and checks it against
-// the hash prefix.
-//
-// If `key` is not NULL, then this checks that the signature is
-// correct.
-//
-// This function does not modify `ctx`.  Instead, it first duplicates
-// `ctx` and then hashes the the meta-data into that context.
-//
-// This function fails if the signature is not valid, or the key is
-// not valid.
-//
-// A signature is valid if:
-//
-//   - The signature is alive now (not created in the future, and not
-//     yet expired)
-//
-//   - It is accepted by the policy.
-//
-// A key is valid if as of the signature creation time:
-//
-//   - The certificate is valid according to the policy.
-//
-//   - The certificate is alive
-//
-//   - The certificate is not revoke
-//
-//   - The key is alive
-//
-//   - The key is not revoke
-//
-//   - The key has the signing capability set.
-ffi!(fn pgpVerifySignature(key: *const PgpDigParams,
-                           sig: *const PgpDigParams,
-                           ctx: *mut digest::DigestContext) -> ErrorCode {
+ffi!(
+/// Verifies the signature.
+///
+/// If `key` is NULL, then this computes the hash and checks it against
+/// the hash prefix.
+///
+/// If `key` is not NULL, then this checks that the signature is
+/// correct.
+///
+/// This function does not modify `ctx`.  Instead, it first duplicates
+/// `ctx` and then hashes the the meta-data into that context.
+///
+/// This function fails if the signature is not valid, or the key is
+/// not valid.
+///
+/// A signature is valid if:
+///
+///   - The signature is alive now (not created in the future, and not
+///     yet expired)
+///
+///   - It is accepted by the policy.
+///
+/// A key is valid if as of the signature creation time:
+///
+///   - The certificate is valid according to the policy.
+///
+///   - The certificate is alive
+///
+///   - The certificate is not revoke
+///
+///   - The key is alive
+///
+///   - The key is not revoke
+///
+///   - The key has the signing capability set.
+fn pgpVerifySignature(key: *const PgpDigParams,
+                      sig: *const PgpDigParams,
+                      ctx: *mut digest::DigestContext) -> ErrorCode {
     let key = check_optional_ptr!(key);
     let sig = check_ptr!(sig);
     // This function MUST NOT free or even change ctx.
@@ -540,18 +550,19 @@ ffi!(fn pgpVerifySignature(key: *const PgpDigParams,
     }
 });
 
-// Returns the Key ID of the public key or the secret key stored in
-// `pkt`.
-//
-// Returns -1 if `pkt` is not a public key or secret key.
-//
-// Note: this function does not handle public subkeys or secret
-// subkeys!
-//
-// `keyid` was allocated by the caller and points to at least 8 bytes.
-//
-// Returns 0 on success and -1 on failure.
-ffi!(fn pgpPubkeyKeyID(pkt: *const u8, pktlen: size_t, keyid: *mut u8)
+ffi!(
+/// Returns the Key ID of the public key or the secret key stored in
+/// `pkt`.
+///
+/// Returns -1 if `pkt` is not a public key or secret key.
+///
+/// Note: this function does not handle public subkeys or secret
+/// subkeys!
+///
+/// `keyid` was allocated by the caller and points to at least 8 bytes.
+///
+/// Returns 0 on success and -1 on failure.
+fn pgpPubkeyKeyID(pkt: *const u8, pktlen: size_t, keyid: *mut u8)
      -> Binary
 {
     let pkt = check_slice!(pkt, pktlen);
@@ -577,14 +588,15 @@ ffi!(fn pgpPubkeyKeyID(pkt: *const u8, pktlen: size_t, keyid: *mut u8)
     }
 });
 
-// Wraps the data in ascii armor.
-//
-// `atype` is the armor type.
-//
-// The caller must free the returned buffer.
-//
-// Returns NULL on failure.
-ffi!(fn pgpArmorWrap(atype: c_int, s: *const c_char, ns: size_t)
+ffi!(
+/// Wraps the data in ascii armor.
+///
+/// `atype` is the armor type.
+///
+/// The caller must free the returned buffer.
+///
+/// Returns NULL on failure.
+fn pgpArmorWrap(atype: c_int, s: *const c_char, ns: size_t)
      -> *mut c_char
 {
     let atype = armor::Kind::try_from(PgpArmor::from(atype))?;
@@ -606,13 +618,14 @@ ffi!(fn pgpArmorWrap(atype: c_int, s: *const c_char, ns: size_t)
     Ok(ptr)
 });
 
-// Returns the length of the certificate in bytes.
-//
-// `pkts` points to a buffer.  This fails if `pkts` does not point to
-// exactly one valid OpenPGP certificate.
-//
-// Returns 0 on failure.
-ffi!(fn pgpPubKeyCertLen(pkts: *const u8, pktslen: size_t,
+ffi!(
+/// Returns the length of the certificate in bytes.
+///
+/// `pkts` points to a buffer.  This fails if `pkts` does not point to
+/// exactly one valid OpenPGP certificate.
+///
+/// Returns 0 on failure.
+fn pgpPubKeyCertLen(pkts: *const u8, pktslen: size_t,
                          certlen: *mut size_t) -> Binary
 {
     use openpgp::packet::Header;
@@ -784,22 +797,23 @@ ffi!(fn pgpPubKeyCertLen(pkts: *const u8, pktslen: size_t,
     }
 });
 
-// Parses OpenPGP data.
-//
-// If `pkts` contains a signature and `pkttype` is 0 or
-// `Tag::Signature`, this returns a `PgpDigParams` containing a
-// signature.
-//
-// If `pkts` contains a certificate and `pkttype` is 0,
-// `Tag::PublicKey`, or `Tag::SecretKey`, this returns a
-// `PgpDigParams` containing a certificate.  The certificate is
-// checked for validity in the sense that it only contains packets
-// that belong to a certificate; this function does not check the
-// binding signatures, etc.
-//
-// Returns 0 on success, -1 on failure.
-ffi!(fn pgpPrtParams(pkts: *const u8, pktlen: size_t,
-                     pkttype: c_uint, paramsp: *mut *mut PgpDigParams)
+ffi!(
+/// Parses OpenPGP data.
+///
+/// If `pkts` contains a signature and `pkttype` is 0 or
+/// `Tag::Signature`, this returns a `PgpDigParams` containing a
+/// signature.
+///
+/// If `pkts` contains a certificate and `pkttype` is 0,
+/// `Tag::PublicKey`, or `Tag::SecretKey`, this returns a
+/// `PgpDigParams` containing a certificate.  The certificate is
+/// checked for validity in the sense that it only contains packets
+/// that belong to a certificate; this function does not check the
+/// binding signatures, etc.
+///
+/// Returns 0 on success, -1 on failure.
+fn pgpPrtParams(pkts: *const u8, pktlen: size_t,
+                pkttype: c_uint, paramsp: *mut *mut PgpDigParams)
     -> Binary
 {
     let pkttype: Option<Tag> = if pkttype == 0 {
@@ -900,11 +914,12 @@ ffi!(fn pgpPrtParams(pkts: *const u8, pktlen: size_t,
     Ok(())
 });
 
-// Returns a `PgpDigParams` data structure for each subkey.
-ffi!(fn pgpPrtParamsSubkeys(pkts: *const u8, pktlen: size_t,
-                            _mainkey: *const PgpDigParams,
-                            subkeys: *mut *mut PgpDigParams,
-                            subkeys_count: *mut c_int) -> Binary {
+ffi!(
+/// Returns a `PgpDigParams` data structure for each subkey.
+fn pgpPrtParamsSubkeys(pkts: *const u8, pktlen: size_t,
+                       _mainkey: *const PgpDigParams,
+                       subkeys: *mut *mut PgpDigParams,
+                       subkeys_count: *mut c_int) -> Binary {
     let pkts = check_slice!(pkts, pktlen);
     let subkeys = check_mut!(subkeys);
     *subkeys = std::ptr::null_mut();
@@ -968,15 +983,16 @@ ffi!(fn pgpPrtParamsSubkeys(pkts: *const u8, pktlen: size_t,
     Ok(())
 });
 
-// Strips the armor armor and returns the decoded data in `pkt`.
-//
-// Despite its name, this function does not actually parse any OpenPGP
-// packets; it just strips the ascii armor encoding.
-//
-// Returns the type of armor on success (>0) or an error code
-// indicating the type of failure (<0).
-ffi!(fn pgpParsePkts(armor: *const c_char,
-                     pkt: *mut *mut c_char, pktlen: *mut size_t)
+ffi!(
+/// Strips the armor armor and returns the decoded data in `pkt`.
+///
+/// Despite its name, this function does not actually parse any OpenPGP
+/// packets; it just strips the ascii armor encoding.
+///
+/// Returns the type of armor on success (>0) or an error code
+/// indicating the type of failure (<0).
+fn pgpParsePkts(armor: *const c_char,
+                pkt: *mut *mut c_char, pktlen: *mut size_t)
      -> PgpArmor
 {
     let armor = check_cstr!(armor);
@@ -1002,10 +1018,11 @@ ffi!(fn pgpParsePkts(armor: *const c_char,
     Ok(kind.into())
 });
 
-// Lints the first certificate in pkts.
-ffi!(fn pgpPubkeyLint(pkts: *const c_char,
-                      pktslen: size_t,
-                      explanation: *mut *mut c_char) -> ErrorCode
+ffi!(
+/// Lints the first certificate in pkts.
+fn pgpPubkeyLint(pkts: *const c_char,
+                 pktslen: size_t,
+                 explanation: *mut *mut c_char) -> ErrorCode
 {
     let pkts = check_slice!(pkts, pktslen);
     let explanation = check_mut!(explanation);
