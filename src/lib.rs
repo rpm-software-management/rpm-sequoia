@@ -362,30 +362,6 @@ fn pgpDigParamsCreationTime(dig: *const PgpDigParams) -> u32[0] {
 });
 
 ffi!(
-/// Returns the signature's hash prefix as a big endian 16-bit number.
-///
-/// The hash prefix is the first (most significant) two bytes of the
-/// signature's hash.  This function returns those two bytes.
-///
-/// If `dig` is not a signature, then this returns 0.
-fn pgpDigParamsHashPrefix(dig: *const PgpDigParams) -> u16[0] {
-    let dig = check_ptr!(dig);
-    let p = match &dig.obj {
-        PgpDigParamsObj::Cert(_cert) => {
-            0
-        }
-        PgpDigParamsObj::Subkey(_cert, _fpr) => {
-            0
-        }
-        PgpDigParamsObj::Signature(sig) => {
-            let p = sig.digest_prefix();
-            ((p[0] as u16) << 8) + (p[1] as u16)
-        }
-    };
-    Ok(p)
-});
-
-ffi!(
 /// Verifies the signature.
 ///
 /// If `key` is NULL, then this computes the hash and checks it against
