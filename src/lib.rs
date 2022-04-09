@@ -84,13 +84,6 @@ lazy_static::lazy_static! {
 //
 // stub!(pgpReadPkts);
 
-// Not yet implemented.
-stub!(pgpNewDig);
-stub!(pgpFreeDig);
-stub!(pgpDigGetParams);
-stub!(pgpPrtPkts);
-
-
 enum PgpDigParamsObj {
     Cert(Cert),
     Subkey(Cert, Fingerprint),
