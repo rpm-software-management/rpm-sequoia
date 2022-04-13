@@ -276,6 +276,8 @@ ffi!(
 /// The caller must not free the returned buffer.
 fn pgpDigParamsSignID(dig: *const PgpDigParams) -> *const u8 {
     let dig = check_ptr!(dig);
+    t!("SignID: {}",
+       dig.signid.iter().map(|v| format!("{:02X}", v)).collect::<String>());
     Ok(dig.signid.as_ptr())
 });
 
@@ -552,6 +554,11 @@ fn pgpPubkeyKeyID(pkt: *const u8, pktlen: size_t, keyid: *mut u8)
     } else {
         None
     };
+
+    t!("Key ID: {}",
+       k.as_ref()
+           .map(|k| k.to_string())
+           .unwrap_or_else(|| String::from("none")));
 
     if let Some(k) = k {
         let buffer = check_mut_slice!(keyid, 8);
@@ -934,6 +941,8 @@ fn pgpPrtParamsSubkeys(pkts: *const u8, pktlen: size_t,
     let mut keys: Vec<*mut PgpDigParams> = cert
         .keys().subkeys()
         .map(|ka| {
+            t!("Subkey: {}", ka.keyid());
+
             let zeros = [0; 8];
             let mut dig = PgpDigParams {
                 obj: PgpDigParamsObj::Subkey(cert.clone(), ka.fingerprint()),
