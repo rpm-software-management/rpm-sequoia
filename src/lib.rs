@@ -37,7 +37,7 @@ use openpgp::packet::{
 use openpgp::parse::{PacketParser, PacketParserResult};
 use openpgp::parse::Parse;
 use openpgp::policy::{
-    NullPolicy,
+    StandardPolicy,
     Policy,
 };
 use openpgp::types::RevocationStatus;
@@ -54,8 +54,7 @@ use rpm::{
 };
 pub mod digest;
 
-//pub const P: &StandardPolicy = &StandardPolicy::new();
-pub const P: &NullPolicy = &NullPolicy::new();
+pub const P: &StandardPolicy = &StandardPolicy::new();
 
 // Set according to the RPM_TRACE environment variable (enabled if
 // non-zero), or if we are built in debug mode.
