@@ -63,8 +63,6 @@ lazy_static::lazy_static! {
         if let Ok(v) = env::var("RPM_TRACE") {
             let v: isize = v.parse().unwrap_or(1);
             v != 0
-        } else if cfg!(debug_assertions) {
-            true
         } else {
             false
         }
