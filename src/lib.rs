@@ -450,17 +450,22 @@ fn pgpVerifySignature(key: *const PgpDigParams,
         };
 
         // Find the key.
-        match vc.keys()
-            .alive()
-            .revoked(false)
-            .for_signing()
-            .key_handle(issuer.clone())
-            .next()
-        {
-            Some(key) => {
-                // Finally we can verify the signature.
-                sig.clone().verify_hash(&key, ctx.ctx.clone())?;
-                return Ok(());
+        match vc.keys().key_handle(issuer.clone()).next() {
+            Some(ka) => {
+                if ! ka.for_signing() {
+                    return Err(Error::Fail(
+                        format!("key invalid: key is not signing capable")));
+                } else if let Err(err) = ka.alive() {
+                    return Err(Error::Fail(
+                        format!("key invalid: key is not alive: {}", err)));
+                } else if let RevocationStatus::Revoked(_) = ka.revocation_status() {
+                    return Err(Error::Fail(
+                        format!("key invalid: key is revoked")));
+                } else {
+                    // Finally we can verify the signature.
+                    sig.clone().verify_hash(&ka, ctx.ctx.clone())?;
+                    return Ok(());
+                }
             }
             None => {
                 return Err(Error::Fail(
