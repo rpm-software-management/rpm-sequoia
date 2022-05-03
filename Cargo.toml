@@ -18,7 +18,7 @@ gitlab = { repository = "sequoia-pgp/rpm-sequoia" }
 
 [dependencies]
 anyhow = "1"
-buffered-reader = "1"
+buffered-reader = { version = "1", default-features = false }
 lazy_static = "1"
 libc = "0.2"
 sequoia-openpgp = { version = "1.8", default-features = false }
@@ -29,7 +29,8 @@ crate-type = ["cdylib"]
 
 [features]
 default = [
-    "sequoia-openpgp/default",
+    # We explicitly do not want to enable Sequoia's decompression support.
+    "crypto-nettle",
 ]
 crypto-nettle = ["sequoia-openpgp/crypto-nettle"]
 crypto-cng = ["sequoia-openpgp/crypto-cng"]
