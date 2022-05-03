@@ -19,19 +19,19 @@ pub struct DigestContext {
 }
 
 impl DigestContext {
-    pub fn digest_size(&self) -> usize {
+    pub(crate) fn digest_size(&self) -> usize {
         self.ctx.digest_size()
     }
 
-    pub fn update<T: AsRef<[u8]>>(&mut self, data: T) {
+    pub(crate) fn update<T: AsRef<[u8]>>(&mut self, data: T) {
         self.ctx.update(data.as_ref());
     }
 
-    pub fn digest(&mut self, digest: &mut [u8]) -> Result<()> {
+    pub(crate) fn digest(&mut self, digest: &mut [u8]) -> Result<()> {
         Ok(self.ctx.digest(digest)?)
     }
 
-    pub fn into_digest(self) -> Result<Vec<u8>> {
+    pub(crate) fn into_digest(self) -> Result<Vec<u8>> {
         Ok(self.ctx.into_digest()?)
     }
 }
