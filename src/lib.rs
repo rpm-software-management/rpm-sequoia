@@ -1007,7 +1007,7 @@ fn pgpParsePkts(armor: *const c_char,
 
 ffi!(
 /// Lints the first certificate in pkts.
-fn pgpPubkeyLint(pkts: *const c_char,
+fn pgpPubKeyLint(pkts: *const c_char,
                  pktslen: size_t,
                  explanation: *mut *mut c_char) -> ErrorCode
 {
