@@ -1,63 +1,133 @@
 use std::env;
 use std::fs::File;
-use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::collections::HashMap;
 
-fn main() -> Result<(), std::io::Error> {
+use anyhow::Result;
+
+struct PkgConfigTemplate {
+    cargo_toml: HashMap<String, String>,
+    pc_in: String,
+}
+
+impl PkgConfigTemplate {
+    /// Read the pkg-config template file.
+    fn new<P, S>(src: P, pc_in: S) -> Result<Self>
+        where P: AsRef<Path>, S: AsRef<str>
+    {
+        let src = src.as_ref();
+
+        let mut pc_in_ = PathBuf::from(src);
+        pc_in_.push(pc_in.as_ref());
+        let pc_in = pc_in_;
+
+        let pc_in = std::fs::read_to_string(pc_in)?;
+
+        let cargo_toml = HashMap::from([
+            ("NAME".to_string(), env!("CARGO_PKG_NAME").to_string()),
+            ("DESCRIPTION".to_string(), env!("CARGO_PKG_DESCRIPTION").to_string()),
+            ("VERSION".to_string(), env!("CARGO_PKG_VERSION").to_string()),
+            ("HOMEPAGE".to_string(), env!("CARGO_PKG_HOMEPAGE").to_string()),
+        ]);
+
+        Ok(PkgConfigTemplate {
+            cargo_toml,
+            pc_in,
+        })
+    }
+
+    /// Perform substitutions on the pkg-config file based on what was
+    /// read from the Cargo.toml file and the provided substitution
+    /// map.
+    ///
+    /// The mappings in the substitution map are preferred to those in
+    /// the Cargo.toml file.
+    ///
+    /// Substitutions take the form of keys and values where the
+    /// string @KEY@ is substituted with the value of KEY.  So,
+    /// @VERSION@ is substituted with the value of VERSION.
+    fn substitute(&self, map: HashMap<String, String>) -> Result<String> {
+        let mut pc: String = self.pc_in.clone();
+
+        for (key, value) in map.iter().chain(self.cargo_toml.iter()) {
+            pc = pc.replace(&format!("@{}@", key), value);
+        }
+
+        Ok(pc)
+    }
+}
+
+
+fn main() -> Result<(), anyhow::Error> {
     // Generate
-    // ${CARGO_TARGET_DIR}/${PROFILE}/rpm-sequoia.pc from
-    // ${SRC}/rpm-sequoia.pc.in.
+    // ${CARGO_TARGET_DIR}/${PROFILE}/rpm-sequoia{-uninstalled}.pc
+    // from ${SRC}/rpm-sequoia.pc.in.
 
-    // Location of rpm-sequoia.pc.in.
     let src = env::current_dir()?;
-    let mut pc_in = PathBuf::from(&src);
-    pc_in.push("rpm-sequoia.pc.in");
 
     // Location of the build directory (e.g.,
     // `/tmp/rpm-sequoia/debug`).
     let mut build_dir = PathBuf::from(&src);
     if let Some(target_dir) = env::var_os("CARGO_TARGET_DIR") {
-        // If CARGO_TARGET_DIR is absolute, this will first clear pc.
+        // Note: if CARGO_TARGET_DIR is absolute, this will first
+        // clear build_dir, which is what we want.
         build_dir.push(target_dir);
     } else {
         build_dir.push("target");
     }
-    let profile = env::var_os("PROFILE")
-        .expect("PROFILE not set");
+    let profile = env::var_os("PROFILE").expect("PROFILE not set");
     build_dir.push(&profile);
 
-    // Location of rpm-sequoia.pc.
+
+    let pc_in = PkgConfigTemplate::new(&src, "rpm-sequoia.pc.in")?;
+
+    // Generate rpm-sequoia.pc.
     let mut pc = build_dir.clone();
     pc.push("rpm-sequoia.pc");
 
-    // Read the .pc.in file, do the substitutions, and generate the
-    // .pc file.
-    let mut pc_in = File::open(pc_in)?;
-    let mut content = Vec::new();
-    pc_in.read_to_end(&mut content)?;
+    let prefix = env::var_os("PREFIX");
+    let prefix: &str = match prefix.as_ref().map(|s| s.to_str()) {
+        Some(Some(s)) => s,
+        Some(None) => Err(anyhow::anyhow!("PREFIX contains invalid UTF-8"))?,
+        None => "/usr/local",
+    };
 
-    // This is set to allow the use of the library from the build
-    // directory.
-    let content = String::from_utf8(content).unwrap()
-        .replace("LIBDIR",
-                 &build_dir
-                     .to_str()
-                     .expect("build directory is not UTF-8 encoded"))
-        .replace("VERSION",
-                 &env::var_os("CARGO_PKG_VERSION")
-                     .expect("CARGO_PKG_VERSION not set")
-                     .into_string()
-                     .expect("CARGO_PKG_VERSION is not UTF-8 encoded"));
+    let content = pc_in.substitute(HashMap::from([
+        ("PREFIX".to_string(), prefix.into()),
+        ("LIBDIR".to_string(), "${prefix}/lib".into()),
+    ]))?;
 
     let mut pc = File::create(&pc).expect(
         &format!("Creating {:?} (CARGO_TARGET_DIR: {:?})",
                  pc, env::var_os("CARGO_TARGET_DIR")));
     pc.write_all(content.as_bytes())?;
 
-    println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=rpm-sequoia.pc.in");
 
-    eprintln!("Generated {:?} with:\n{}\nEOF", pc, content);
+    // Generate rpm-sequoia-uninstalled.pc.
+    let mut pc = build_dir.clone();
+    pc.push("rpm-sequoia-uninstalled.pc");
+
+    let content = pc_in.substitute(HashMap::from([
+        ("PREFIX".to_string(),
+         build_dir.to_str()
+             .expect("build directory is not valid UTF-8").to_string()),
+        ("LIBDIR".to_string(), "${prefix}".into()),
+    ]))?;
+
+    let mut pc = File::create(&pc).expect(
+        &format!("Creating {:?} (CARGO_TARGET_DIR: {:?})",
+                 pc, env::var_os("CARGO_TARGET_DIR")));
+    pc.write_all(content.as_bytes())?;
+
+
+    // Rerun if...
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=Cargo.toml");
+    println!("cargo:rerun-if-changed=rpm-sequoia.pc.in");
+    println!("cargo:rerun-if-env-changed=PREFIX");
+    println!("cargo:rerun-if-env-changed=PROFILE");
+    println!("cargo:rerun-if-env-changed=CARGO_TARGET_DIR");
 
     Ok(())
 }

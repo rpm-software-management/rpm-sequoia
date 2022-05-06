@@ -11,11 +11,9 @@ To build, you need [rustc], cargo and [nettle-devel], which is the
 cryptographic library, which Sequoia uses by default.
 
   [rustc]: https://packages.fedoraproject.org/pkgs/rust/rust/
-  [nettle-devel]: https://packages.fedoraproject.org/pkgs/nettle/nettle-deve/l
+  [nettle-devel]: https://packages.fedoraproject.org/pkgs/nettle/nettle-devel
 
-I'm testing with version 1.56.1 of rustc.  As of this writing, Fedora
-34, 35 and 36 all ship with at least version 1.58.1.
-
+Here's how to build rpm-sequoia and a version of rpm that uses it:
 
 ```
 $ mkdir /tmp/rpm
@@ -24,12 +22,12 @@ $ git clone git@gitlab.com:sequoia-pgp/rpm-sequoia.git
 Cloning into 'rpm-sequoia'...
 done.
 $ cd rpm-sequoia
-$ cargo build
+$ PREFIX=/usr cargo build --release && cargo test --release
     Updating crates.io index
 ...
-    Finished dev [unoptimized + debuginfo] target(s) in 48.44s
+test result: ok. ...
 $ cd /tmp/rpm
-$ git clone git@github.com:nwalfield/rpm.git
+$ git clone git@github.com:rpm-software-management/rpm.git
 Cloning into 'rpm'...
 done.
 $ cd rpm
@@ -37,28 +35,42 @@ $ autoreconf -fis
 ...
 $ mkdir b
 $ cd b
-$ export PKG_CONFIG_PATH=/tmp/rpm/rpm-sequoia/target/debug
-$ export LD_LIBRARY_PATH=/tmp/rpm/rpm-sequoia/target/debug
-$ ../configure
+$ export PKG_CONFIG_PATH=/tmp/rpm/rpm-sequoia/target/release
+$ export LD_LIBRARY_PATH=/tmp/rpm/rpm-sequoia/target/release
+$ ../configure --with-crypto=sequoia
 $ make
-$ cd tests
-$ make populate_testing
 $ make check
 ```
 
-Or to run one or two tests, do something like:
+The rpm-sequoia artifacts (the .a, .so, and the .pc files) are placed
+in the build directory, which, in this case, is
+`/tmp/rpm/rpm-sequoia/target/release`.  We also set the `PREFIX`
+environment variable when calling `cargo build`.  This is the prefix
+that will be used in the generated `rpm-sequoia.pc` file.  It defaults
+to `/usr/local`.
 
-```
-$ T="266 273"; for t in $T; do if ! ../../tests/rpmtests $t; then cat rpmtests.dir/$t/rpmtests.log; fi; done
-```
+
+To run just one or two tests, do something like the following:
 
 Note: when building or running the test suite, it is essential to make
-sure `PKG_CONFIG_PATH` and `LD_LIBRARY_PATH` are set appropriately.
+sure `PKG_CONFIG_PATH` and `LD_LIBRARY_PATH` are set appropriately (as
+in the above transcript).
+
+```
+$ cd /tmp/rpm/rpm/b/tests
+$ export PKG_CONFIG_PATH=/tmp/rpm/rpm-sequoia/target/release
+$ export LD_LIBRARY_PATH=/tmp/rpm/rpm-sequoia/target/release
+$ make populate_testing
+$ T="266 273"; for t in $T; do if ! ../../tests/rpmtests $t; then cat rpmtests.dir/$t/rpmtests.log; fi; done
+```
 
 To get tracing output, set RPM_TRACE to 1:
 
 ```
 $ cd /tmp/rpm/rpm/b/tests
+$ export PKG_CONFIG_PATH=/tmp/rpm/rpm-sequoia/target/release
+$ export LD_LIBRARY_PATH=/tmp/rpm/rpm-sequoia/target/release
+$ make populate_testing
 $ export RPM_TRACE=1
 $ ../../tests/rpmtests 273
 $ cat rpmtests.dir/273/rpmtests.log
@@ -67,11 +79,5 @@ $ cat rpmtests.dir/273/rpmtests.log
 +rpmFreeCrypto: entered
 +rpmFreeCrypto: -> success
 273. rpmsigdig.at:495: 273. rpmsign --addsign (rpmsigdig.at:495): FAILED (rpmsigdig.at:503)
+...
 ```
-
-To get a release build, run `cargo --release build`.  You'll then need
-to adjust the paths appropriately.  Specifically, you'll need to use
-`/tmp/rpm/rpm-sequoia/target/release` instead of
-`/tmp/rpm/rpm-sequoia/target/debug`.
-
-

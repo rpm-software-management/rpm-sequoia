@@ -1,10 +1,10 @@
-prefix=
-libdir=LIBDIR
+prefix=@PREFIX@
+libdir=@LIBDIR@
 
-Name: rpm-sequoia
-Description: An implementation of RPM's PGP interface using Sequoia
-URL: https://sequoia-pgp.org/
-Version: VERSION
+Name: @NAME@
+Description: @DESCRIPTION@
+URL: @HOMEPAGE@
+Version: @VERSION@
 Requires: nettle
 Cflags:
 Libs: -L${libdir} -lrpm_sequoia

@@ -24,6 +24,9 @@ libc = "0.2"
 sequoia-openpgp = { version = "1.8", default-features = false }
 thiserror = "1"
 
+[build-dependencies]
+anyhow = "1"
+
 [lib]
 crate-type = ["cdylib"]
 
