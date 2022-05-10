@@ -132,7 +132,7 @@ ffi!(
 ///
 /// If `dig` is NULL or does not contain a signature, then this
 /// function returns -1.
-fn pgpSignatureType(dig: *const PgpDigParams) -> c_int[-1] {
+fn _pgpSignatureType(dig: *const PgpDigParams) -> c_int[-1] {
     let dig = check_ptr!(dig);
 
     dig.signature()
@@ -144,7 +144,7 @@ fn pgpSignatureType(dig: *const PgpDigParams) -> c_int[-1] {
 
 ffi!(
 /// Frees the parameters.
-fn pgpDigParamsFree(dig: Option<&mut PgpDigParams>) {
+fn _pgpDigParamsFree(dig: Option<&mut PgpDigParams>) {
     free!(dig);
 });
 
@@ -165,8 +165,8 @@ ffi!(
 ///
 /// Two subkeys are considered the same if they have the same
 /// fingerprint.  (rpm does not currently use this functionality.)
-fn pgpDigParamsCmp(p1: *const PgpDigParams,
-                   p2: *const PgpDigParams)
+fn _pgpDigParamsCmp(p1: *const PgpDigParams,
+                    p2: *const PgpDigParams)
      -> c_int[1]
 {
     let p1 = check_ptr!(p1);
@@ -205,8 +205,8 @@ ffi!(
 /// `algotype` is either `PGPVAL_PUBKEYALGO` or `PGPVAL_HASHALGO`.
 /// Other algo types are not support and cause this function to return
 /// 0.
-fn pgpDigParamsAlgo(dig: *const PgpDigParams,
-                    algotype: c_uint) -> c_uint[0]
+fn _pgpDigParamsAlgo(dig: *const PgpDigParams,
+                     algotype: c_uint) -> c_uint[0]
 {
     let dig = check_ptr!(dig);
 
@@ -272,7 +272,7 @@ ffi!(
 /// Key ID.
 ///
 /// The caller must not free the returned buffer.
-fn pgpDigParamsSignID(dig: *const PgpDigParams) -> *const u8 {
+fn _pgpDigParamsSignID(dig: *const PgpDigParams) -> *const u8 {
     let dig = check_ptr!(dig);
     t!("SignID: {}",
        dig.signid.iter().map(|v| format!("{:02X}", v)).collect::<String>());
@@ -291,7 +291,7 @@ ffi!(
 /// any embedded NUL characters.
 ///
 /// The caller must not free the returned buffer.
-fn pgpDigParamsUserID(dig: *const PgpDigParams) -> *const c_char {
+fn _pgpDigParamsUserID(dig: *const PgpDigParams) -> *const c_char {
     let dig = check_ptr!(dig);
     if let Some(ref userid) = dig.userid {
         Ok(userid.as_ptr())
@@ -311,7 +311,7 @@ ffi!(
 ///
 /// If `dig` is a subkey, then this returns the version of the subkey's
 /// key packet.
-fn pgpDigParamsVersion(dig: *const PgpDigParams) -> c_int[0] {
+fn _pgpDigParamsVersion(dig: *const PgpDigParams) -> c_int[0] {
     let dig = check_ptr!(dig);
     let version = match &dig.obj {
         PgpDigParamsObj::Cert(cert) => {
@@ -338,7 +338,7 @@ ffi!(
 ///
 /// If `dig` is a subkey, then this returns the subkey's key creation
 /// time.
-fn pgpDigParamsCreationTime(dig: *const PgpDigParams) -> u32[0] {
+fn _pgpDigParamsCreationTime(dig: *const PgpDigParams) -> u32[0] {
     let dig = check_ptr!(dig);
     let t = match &dig.obj {
         PgpDigParamsObj::Cert(cert) => {
@@ -395,9 +395,9 @@ ffi!(
 ///   - The key is not revoke
 ///
 ///   - The key has the signing capability set.
-fn pgpVerifySignature(key: *const PgpDigParams,
-                      sig: *const PgpDigParams,
-                      ctx: *mut digest::DigestContext) -> ErrorCode {
+fn _pgpVerifySignature(key: *const PgpDigParams,
+                       sig: *const PgpDigParams,
+                       ctx: *mut digest::DigestContext) -> ErrorCode {
     let key = check_optional_ptr!(key);
     let sig = check_ptr!(sig);
     // This function MUST NOT free or even change ctx.
@@ -542,7 +542,7 @@ ffi!(
 /// `keyid` was allocated by the caller and points to at least 8 bytes.
 ///
 /// Returns 0 on success and -1 on failure.
-fn pgpPubkeyKeyID(pkt: *const u8, pktlen: size_t, keyid: *mut u8)
+fn _pgpPubkeyKeyID(pkt: *const u8, pktlen: size_t, keyid: *mut u8)
      -> Binary
 {
     let pkt = check_slice!(pkt, pktlen);
@@ -581,7 +581,7 @@ ffi!(
 /// The caller must free the returned buffer.
 ///
 /// Returns NULL on failure.
-fn pgpArmorWrap(atype: c_int, s: *const c_char, ns: size_t)
+fn _pgpArmorWrap(atype: c_int, s: *const c_char, ns: size_t)
      -> *mut c_char
 {
     let atype = armor::Kind::try_from(PgpArmor::from(atype))?;
@@ -610,8 +610,8 @@ ffi!(
 /// exactly one valid OpenPGP certificate.
 ///
 /// Returns 0 on failure.
-fn pgpPubKeyCertLen(pkts: *const u8, pktslen: size_t,
-                         certlen: *mut size_t) -> Binary
+fn _pgpPubKeyCertLen(pkts: *const u8, pktslen: size_t,
+                     certlen: *mut size_t) -> Binary
 {
     use openpgp::packet::Header;
     use openpgp::packet::header::PacketLengthType;
@@ -797,8 +797,8 @@ ffi!(
 /// binding signatures, etc.
 ///
 /// Returns 0 on success, -1 on failure.
-fn pgpPrtParams(pkts: *const u8, pktlen: size_t,
-                pkttype: c_uint, paramsp: *mut *mut PgpDigParams)
+fn _pgpPrtParams(pkts: *const u8, pktlen: size_t,
+                 pkttype: c_uint, paramsp: *mut *mut PgpDigParams)
     -> Binary
 {
     let pkttype: Option<Tag> = if pkttype == 0 {
@@ -901,10 +901,10 @@ fn pgpPrtParams(pkts: *const u8, pktlen: size_t,
 
 ffi!(
 /// Returns a `PgpDigParams` data structure for each subkey.
-fn pgpPrtParamsSubkeys(pkts: *const u8, pktlen: size_t,
-                       _mainkey: *const PgpDigParams,
-                       subkeys: *mut *mut PgpDigParams,
-                       subkeys_count: *mut c_int) -> Binary {
+fn _pgpPrtParamsSubkeys(pkts: *const u8, pktlen: size_t,
+                        _mainkey: *const PgpDigParams,
+                        subkeys: *mut *mut PgpDigParams,
+                        subkeys_count: *mut c_int) -> Binary {
     let pkts = check_slice!(pkts, pktlen);
     let subkeys = check_mut!(subkeys);
     *subkeys = std::ptr::null_mut();
@@ -978,8 +978,8 @@ ffi!(
 ///
 /// Returns the type of armor on success (>0) or an error code
 /// indicating the type of failure (<0).
-fn pgpParsePkts(armor: *const c_char,
-                pkt: *mut *mut c_char, pktlen: *mut size_t)
+fn _pgpParsePkts(armor: *const c_char,
+                 pkt: *mut *mut c_char, pktlen: *mut size_t)
      -> PgpArmor
 {
     let armor = check_cstr!(armor);
@@ -1007,9 +1007,9 @@ fn pgpParsePkts(armor: *const c_char,
 
 ffi!(
 /// Lints the first certificate in pkts.
-fn pgpPubKeyLint(pkts: *const c_char,
-                 pktslen: size_t,
-                 explanation: *mut *mut c_char) -> ErrorCode
+fn _pgpPubKeyLint(pkts: *const c_char,
+                  pktslen: size_t,
+                  explanation: *mut *mut c_char) -> ErrorCode
 {
     let pkts = check_slice!(pkts, pktslen);
     let explanation = check_mut!(explanation);

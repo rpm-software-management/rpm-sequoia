@@ -38,13 +38,13 @@ impl DigestContext {
 
 ffi!(
 /// int rpmInitCrypto(void)
-fn rpmInitCrypto() -> Binary {
+fn _rpmInitCrypto() -> Binary {
     Ok(())
 });
 
 ffi!(
 /// int rpmFreeCrypto(void)
-fn rpmFreeCrypto() -> Binary {
+fn _rpmFreeCrypto() -> Binary {
     Ok(())
 });
 
@@ -52,7 +52,7 @@ ffi!(
 /// DIGEST_CTX rpmDigestInit(int hashalgo, rpmDigestFlags flags)
 ///
 /// rpmDigestFlags currently does not define any flags.
-fn rpmDigestInit(hashalgo: c_int, flags: c_int) -> *mut DigestContext {
+fn _rpmDigestInit(hashalgo: c_int, flags: c_int) -> *mut DigestContext {
     if hashalgo < 0 || hashalgo > u8::MAX as c_int {
         return Err(Error::Fail("Out of range".into()));
     }
@@ -71,14 +71,14 @@ fn rpmDigestInit(hashalgo: c_int, flags: c_int) -> *mut DigestContext {
 
 ffi!(
 /// DIGEST_CTX rpmDigestDup(DIGEST_CTX octx)
-fn rpmDigestDup(ctx: *const DigestContext) -> *mut DigestContext {
+fn _rpmDigestDup(ctx: *const DigestContext) -> *mut DigestContext {
     let ctx = check_ptr!(ctx);
     Ok(Box::into_raw(Box::new(ctx.clone())))
 });
 
 ffi!(
 /// size_t rpmDigestLength(int hashalgo)
-fn rpmDigestLength(hashalgo: c_int) -> size_t[0] {
+fn _rpmDigestLength(hashalgo: c_int) -> size_t[0] {
     if hashalgo < 0 || hashalgo > u8::MAX as c_int {
         return Ok(0);
     }
@@ -101,8 +101,8 @@ fn rpmDigestLength(hashalgo: c_int) -> size_t[0] {
 
 ffi!(
 /// int rpmDigestUpdate(DIGEST_CTX ctx, const void * data, size_t len)
-fn rpmDigestUpdate(ctx: *mut DigestContext,
-                   data: *const u8, len: size_t) -> ErrorCode {
+fn _rpmDigestUpdate(ctx: *mut DigestContext,
+                    data: *const u8, len: size_t) -> ErrorCode {
     let ctx = check_mut!(ctx);
     let data = check_slice!(data, len);
 
@@ -113,9 +113,9 @@ fn rpmDigestUpdate(ctx: *mut DigestContext,
 
 ffi!(
 /// int rpmDigestFinal(DIGEST_CTX ctx, void ** datap, size_t *lenp, int asAscii)
-fn rpmDigestFinal(ctx: *mut DigestContext,
-                  datap: *mut *mut u8, lenp: *mut size_t,
-                  as_ascii: c_int) -> Binary
+fn _rpmDigestFinal(ctx: *mut DigestContext,
+                   datap: *mut *mut u8, lenp: *mut size_t,
+                   as_ascii: c_int) -> Binary
 {
     let ctx = claim_from_c!(ctx);
     let datap = check_optional_mut!(datap);
