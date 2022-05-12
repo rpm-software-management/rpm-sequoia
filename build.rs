@@ -143,11 +143,34 @@ fn main() -> Result<(), anyhow::Error> {
     let linker_lines = cdylib_link_lines::shared_object_link_args(
         "rpm_sequoia",
         &major, &minor, &patch, &arch, &os, &env,
-        PathBuf::from(prefix).join("lib"), build_dir,
+        PathBuf::from(prefix).join("lib"), build_dir.clone(),
     );
 
     for line in linker_lines {
         println!("cargo:rustc-cdylib-link-arg={}", line);
+    }
+
+    #[cfg(unix)]
+    {
+        // Create a symlink.
+        let mut create = true;
+
+        let mut link = build_dir.clone();
+        link.push(format!("librpm_sequoia.so.{}", major));
+
+        if let Ok(current) = std::fs::read_link(&link) {
+            if current.to_str() == Some("librpm_sequoia.so") {
+                // Do nothing.
+                create = false;
+            } else {
+                // Invalid.
+                std::fs::remove_file(&link)?;
+            }
+        }
+
+        if create {
+            std::os::unix::fs::symlink("librpm_sequoia.so", link)?;
+        }
     }
 
     Ok(())
