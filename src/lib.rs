@@ -54,7 +54,7 @@ use rpm::{
 };
 pub mod digest;
 
-pub const P: &StandardPolicy = &StandardPolicy::new();
+const P: &StandardPolicy = &StandardPolicy::new();
 
 // Set according to the RPM_TRACE environment variable (enabled if
 // non-zero), or if we are built in debug mode.
