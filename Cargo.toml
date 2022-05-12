@@ -26,6 +26,7 @@ thiserror = "1"
 
 [build-dependencies]
 anyhow = "1"
+cdylib-link-lines = "0.1.4"
 
 [lib]
 crate-type = ["cdylib"]

@@ -129,5 +129,26 @@ fn main() -> Result<(), anyhow::Error> {
     println!("cargo:rerun-if-env-changed=PROFILE");
     println!("cargo:rerun-if-env-changed=CARGO_TARGET_DIR");
 
+
+    // Set the soname.
+    let arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
+    let os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+    let env = env::var("CARGO_CFG_TARGET_ENV").unwrap();
+
+    // We do not care about `_pre` and such.
+    let major = env::var("CARGO_PKG_VERSION_MAJOR").unwrap();
+    let minor = env::var("CARGO_PKG_VERSION_MINOR").unwrap();
+    let patch = env::var("CARGO_PKG_VERSION_PATCH").unwrap();
+
+    let linker_lines = cdylib_link_lines::shared_object_link_args(
+        "rpm_sequoia",
+        &major, &minor, &patch, &arch, &os, &env,
+        PathBuf::from(prefix).join("lib"), build_dir,
+    );
+
+    for line in linker_lines {
+        println!("cargo:rustc-cdylib-link-arg={}", line);
+    }
+
     Ok(())
 }
