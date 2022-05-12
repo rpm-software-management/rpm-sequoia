@@ -1082,6 +1082,8 @@ fn _pgpPubKeyLint(pkts: *const c_char,
                 }
                 Ok(ka) => {
                     if ! ka.for_signing() {
+                        // Silently ignore non-signing capable
+                        // subkeys.  We don't care about them.
                         continue;
                     }
 
