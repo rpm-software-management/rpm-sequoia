@@ -1,3 +1,55 @@
+//! An implementation of RPM's OpenPGP interface.
+//!
+//! This library provides an implementation of [RPM's OpenPGP
+//! interface](https://github.com/rpm-software-management/rpm/blob/master/include/rpm/rpmpgp.h).
+//!
+//! **You should not link to this library directly**.
+//!
+//! If you are looking for an OpenPGP interface, consider using
+//! [Sequoia], which this library is based on.  If you want to use
+//! RPM's OpenPGP interface, which you should only do if you are
+//! interacting with RPM, then you should link against [RPM], which
+//! reexports this interface.
+//!
+//! [Sequoia]: https://gitlab.com/sequoia-pgp/sequoia
+//! [RPM]: http://rpm.org
+//!
+//! If you are investigating a bug in this library, set the
+//! `RPM_TRACE` environment variable to 1 to get a verbose trace of
+//! the library's execution:
+//!
+//! ```sh
+//! $ LD_LIBRARY_PATH=/tmp/rpm-sequoia/release RPM_TRACE=1 ./rpmkeys \
+//!   --import ../tests/data/keys/CVE-2021-3521-badbind.asc
+//! _rpmInitCrypto: entered
+//! _rpmInitCrypto: -> success
+//! _pgpParsePkts: entered
+//! ...
+//! ```
+//!
+//! # Policy
+//!
+//! When Sequoia evaluates the validity of an object (e.g., a
+//! cryptographic signature) it consults a policy.  The policy is user
+//! defined.  This library uses [Sequoia's standard policy].
+//!
+//! [Sequoia's standard policy]: https://docs.sequoia-pgp.org/sequoia_openpgp/policy/struct.StandardPolicy.html
+//!
+//! Sequoia's standard policy allows self-signatures (i.e., the
+//! signatures that bind a User ID or subkey to a certificate) made
+//! with SHA-1 until February 2023.  It completely disallows data
+//! signatures made with SHA-1.  The reason for this is that SHA-1
+//! collision resistance is broken, but its second pre-image
+//! resistance is still okay.
+//!
+//! As an added protection, Sequoia uses [SHA-1 collision detection],
+//! which is a variant of SHA-1, which mitigates known attacks against
+//! SHA-1.  SHA-1 CD has a very low [false positive rate] (2^-90) so
+//! it can be treated as a drop-in, fully compatible replacement for
+//! SHA-1.
+//!
+//! [SHA-1 collision detection]: https://github.com/cr-marcstevens/sha1collisiondetection
+//! [false positive rate]: https://github.com/cr-marcstevens/sha1collisiondetection#about
 use std::env;
 use std::ffi::{
     CString,
@@ -81,6 +133,10 @@ lazy_static::lazy_static! {
 //
 // stub!(pgpReadPkts);
 
+/// An OpenPGP object.
+///
+/// This data structure can hold either a signature, a certificate, or
+/// a subkey.
 enum PgpDigParamsObj {
     Cert(Cert),
     Subkey(Cert, Fingerprint),
@@ -266,12 +322,12 @@ ffi!(
 ///
 /// If `dig` is a signature, then this returns the Key ID stored in the
 /// first Issuer or Issuer Fingerprint subpacket as a hex string.
-/// (This is not authenticated.)
+/// (This is not authenticated!)
 ///
 /// If `dig` is a certificate or a subkey, then this returns the key's
 /// Key ID.
 ///
-/// The caller must not free the returned buffer.
+/// The caller must *not* free the returned buffer.
 fn _pgpDigParamsSignID(dig: *const PgpDigParams) -> *const u8 {
     let dig = check_ptr!(dig);
     t!("SignID: {}",
@@ -282,15 +338,15 @@ fn _pgpDigParamsSignID(dig: *const PgpDigParams) -> *const u8 {
 ffi!(
 /// Returns the primary User ID, if any.
 ///
-/// If `dig` is a signature, then this returns NULL.
+/// If `dig` is a signature, then this returns `NULL`.
 ///
 /// If `dig` is a certificate or a subkey, then this returns the
 /// certificate's primary User ID, if any.
 ///
 /// This interface does not provide a way for the caller to recognize
-/// any embedded NUL characters.
+/// any embedded `NUL` characters.
 ///
-/// The caller must not free the returned buffer.
+/// The caller must *not* free the returned buffer.
 fn _pgpDigParamsUserID(dig: *const PgpDigParams) -> *const c_char {
     let dig = check_ptr!(dig);
     if let Some(ref userid) = dig.userid {
@@ -363,28 +419,28 @@ fn _pgpDigParamsCreationTime(dig: *const PgpDigParams) -> u32[0] {
 ffi!(
 /// Verifies the signature.
 ///
-/// If `key` is NULL, then this computes the hash and checks it against
-/// the hash prefix.
+/// If `key` is `NULL`, then this computes the hash and checks it
+/// against the hash prefix.
 ///
-/// If `key` is not NULL, then this checks that the signature is
+/// If `key` is not `NULL`, then this checks that the signature is
 /// correct.
 ///
 /// This function does not modify `ctx`.  Instead, it first duplicates
 /// `ctx` and then hashes the the meta-data into that context.
 ///
-/// This function fails if the signature is not valid, or the key is
-/// not valid.
+/// This function fails if the signature is not valid, or a supplied
+/// key is not valid.
 ///
 /// A signature is valid if:
 ///
 ///   - The signature is alive now (not created in the future, and not
 ///     yet expired)
 ///
-///   - It is accepted by the policy.
+///   - It is accepted by the [policy].
 ///
-/// A key is valid if as of the signature creation time:
+/// A key is valid if as of the *signature's* creation time if:
 ///
-///   - The certificate is valid according to the policy.
+///   - The certificate is valid according to the [policy].
 ///
 ///   - The certificate is alive
 ///
@@ -395,6 +451,8 @@ ffi!(
 ///   - The key is not revoke
 ///
 ///   - The key has the signing capability set.
+///
+/// [policy]: index.html#policy
 fn _pgpVerifySignature(key: *const PgpDigParams,
                        sig: *const PgpDigParams,
                        ctx: *mut digest::DigestContext) -> ErrorCode {
@@ -539,7 +597,8 @@ ffi!(
 /// Note: this function does not handle public subkeys or secret
 /// subkeys!
 ///
-/// `keyid` was allocated by the caller and points to at least 8 bytes.
+/// `keyid` must be allocated by the caller and points to at least 8
+/// bytes of memory.
 ///
 /// Returns 0 on success and -1 on failure.
 fn _pgpPubkeyKeyID(pkt: *const u8, pktlen: size_t, keyid: *mut u8)
@@ -574,13 +633,13 @@ fn _pgpPubkeyKeyID(pkt: *const u8, pktlen: size_t, keyid: *mut u8)
 });
 
 ffi!(
-/// Wraps the data in ascii armor.
+/// Wraps the data in ASCII armor.
 ///
 /// `atype` is the armor type.
 ///
 /// The caller must free the returned buffer.
 ///
-/// Returns NULL on failure.
+/// Returns `NULL` on failure.
 fn _pgpArmorWrap(atype: c_int, s: *const c_char, ns: size_t)
      -> *mut c_char
 {
@@ -606,7 +665,7 @@ fn _pgpArmorWrap(atype: c_int, s: *const c_char, ns: size_t)
 ffi!(
 /// Returns the length of the certificate in bytes.
 ///
-/// `pkts` points to a buffer.  This fails if `pkts` does not point to
+/// `pkts` points to a buffer.  Fails if `pkts` does not point to
 /// exactly one valid OpenPGP certificate.
 ///
 /// Returns 0 on failure.
@@ -793,8 +852,9 @@ ffi!(
 /// `Tag::PublicKey`, or `Tag::SecretKey`, this returns a
 /// `PgpDigParams` containing a certificate.  The certificate is
 /// checked for validity in the sense that it only contains packets
-/// that belong to a certificate; this function does not check the
-/// binding signatures, etc.
+/// that belong to a certificate; this function does **not** check the
+/// binding signatures, etc.  That check is done when the key is used
+/// in [_pgpVerifySignature].
 ///
 /// Returns 0 on success, -1 on failure.
 fn _pgpPrtParams(pkts: *const u8, pktlen: size_t,
@@ -901,6 +961,10 @@ fn _pgpPrtParams(pkts: *const u8, pktlen: size_t,
 
 ffi!(
 /// Returns a `PgpDigParams` data structure for each subkey.
+///
+/// This does not return a `PgpDigParams` for the primary (just use
+/// this one).  The subkeys are **not** checked for validity.  That
+/// check is done when the key is used in [_pgpVerifySignature].
 fn _pgpPrtParamsSubkeys(pkts: *const u8, pktlen: size_t,
                         _mainkey: *const PgpDigParams,
                         subkeys: *mut *mut PgpDigParams,
@@ -971,10 +1035,10 @@ fn _pgpPrtParamsSubkeys(pkts: *const u8, pktlen: size_t,
 });
 
 ffi!(
-/// Strips the armor armor and returns the decoded data in `pkt`.
+/// Strips the ASCII armor and returns the decoded data in `pkt`.
 ///
 /// Despite its name, this function does not actually parse any OpenPGP
-/// packets; it just strips the ascii armor encoding.
+/// packets; it just strips the ASCII armor encoding.
 ///
 /// Returns the type of armor on success (>0) or an error code
 /// indicating the type of failure (<0).
@@ -1007,6 +1071,29 @@ fn _pgpParsePkts(armor: *const c_char,
 
 ffi!(
 /// Lints the first certificate in pkts.
+///
+/// This function links the certificate according to the current
+/// [policy].  It warns about things like unusable subkeys, because they
+/// do not have a valid binding signature.  It will also generate a
+/// warning if there are no valid, signing-capable keys.
+///
+/// There are four cases:
+///
+/// - The packets do not describe a certificate: returns an error and
+///   sets `*explanation` to `NULL`.
+///
+/// - The packets describe a certificate and the certificate is
+///   completely unusable: returns an error and sets `*explanation` to
+///   a human readable explanation.
+///
+/// - The packets describe a certificate and some components are not
+///   usable: returns success, and sets `*explanation` to a human
+///   readable explanation.
+///
+/// - The packets describe a certificate and there are no lints:
+///   returns success, and sets `*explanation` to `NULL`.
+///
+/// [policy]: index.html#policy
 fn _pgpPubKeyLint(pkts: *const c_char,
                   pktslen: size_t,
                   explanation: *mut *mut c_char) -> ErrorCode
