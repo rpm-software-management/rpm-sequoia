@@ -10,6 +10,8 @@ pub(crate) fn unit<T>(_: T) -> () { () }
 // `$err_to_crt`.
 macro_rules! ffi {
     // Wraps an ffi function, which returns 0 on success and -1 on error.
+    //
+    //   fn func(...) -> Binary
     ($(#[$outer:meta])*
      fn $f:ident($($v:ident: $t:ty),*) -> Binary $body:block) =>
     {
@@ -25,6 +27,8 @@ macro_rules! ffi {
     };
 
     // Wraps an ffi function, which returns an RC.
+    //
+    //   fn func(...) -> ErrorCode
     ($(#[$outer:meta])*
      fn $f:ident($($v:ident: $t:ty),*) -> ErrorCode $body:block) =>
     {
@@ -40,6 +44,8 @@ macro_rules! ffi {
     };
 
     // Wraps an ffi function, which returns a PgpArmorError.
+    //
+    //   fn func(...) -> PgpArmor
     ($(#[$outer:meta])*
      fn $f:ident($($v:ident: $t:ty),*) -> PgpArmor $body:block) =>
     {
@@ -56,6 +62,8 @@ macro_rules! ffi {
 
     // Wraps an ffi function, which returns an object whose type is
     // *const T.  Returns NULL on error.
+    //
+    //   fn func(...) -> *const u8
     ($(#[$outer:meta])*
      fn $f:ident($($v:ident: $t:ty),*) -> *const $value:ty $body:block) =>
     {
@@ -72,6 +80,8 @@ macro_rules! ffi {
 
     // Wraps an ffi function, which returns an object whose type is
     // *mut T.  Returns NULL on error.
+    //
+    //   fn func(...) -> *mut u8
     ($(#[$outer:meta])*
      fn $f:ident($($v:ident: $t:ty),*) -> *mut $value:ty $body:block) =>
     {
@@ -88,6 +98,11 @@ macro_rules! ffi {
 
     // Wraps an ffi function, which returns a value.  The value is passed
     // through as is and errors are mapped to `$err`.
+    //
+    // Example: A function that returns an int.  If the function
+    // returns Err, that is mapped to 1:
+    //
+    //   fn func(...) -> c_int[1]
     ($(#[$outer:meta])*
      fn $f:ident($($v:ident: $t:ty),*) -> $value:ty[$err:expr] $body:block) =>
     {
@@ -107,6 +122,12 @@ macro_rules! ffi {
     // The inner function returns `Result<()>` and this is mapped to `()`.
     //
     // Note: inner body returns Ok(()) by default.
+    //
+    // Example:
+    //
+    //   fn func(...)
+    //
+    // Note: there is no default type in the declaration.
     ($(#[$outer:meta])*
      fn $f:ident($($v:ident: $t:ty),*) $body:block) =>
     {
