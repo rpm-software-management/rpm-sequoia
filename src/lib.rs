@@ -486,6 +486,7 @@ fn _pgpVerifySignature(key: *const PgpDigParams,
         let cert = key.cert().ok_or_else(|| {
             Error::Fail("key is not a cert".into())
         })?;
+        let subkey = key.key().expect("is a certificate").fingerprint();
 
         // We evaluate the certificate as of the signature creation
         // time.
@@ -510,7 +511,10 @@ fn _pgpVerifySignature(key: *const PgpDigParams,
         // Find the key.
         match vc.keys().key_handle(issuer.clone()).next() {
             Some(ka) => {
-                if ! ka.for_signing() {
+                if ka.fingerprint() != subkey {
+                    return Err(Error::Fail(
+                        format!("key invalid: wrong subkey")));
+                } else if ! ka.for_signing() {
                     return Err(Error::Fail(
                         format!("key invalid: key is not signing capable")));
                 } else if let Err(err) = ka.alive() {
