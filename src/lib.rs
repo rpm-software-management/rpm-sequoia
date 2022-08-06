@@ -455,11 +455,11 @@ ffi!(
 /// [policy]: index.html#policy
 fn _pgpVerifySignature(key: *const PgpDigParams,
                        sig: *const PgpDigParams,
-                       ctx: *mut digest::DigestContext) -> ErrorCode {
+                       ctx: *const digest::DigestContext) -> ErrorCode {
     let key = check_optional_ptr!(key);
     let sig = check_ptr!(sig);
     // This function MUST NOT free or even change ctx.
-    let mut ctx = check_mut!(ctx).clone();
+    let mut ctx = check_ptr!(ctx).clone();
 
     let sig = sig.signature().ok_or_else(|| {
         Error::Fail("sig is not a signature".into())
