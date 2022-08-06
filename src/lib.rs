@@ -73,6 +73,12 @@ use libc::{
     size_t,
 };
 
+use chrono::{
+    DateTime,
+    NaiveDateTime,
+    Utc,
+};
+
 use sequoia_openpgp as openpgp;
 use openpgp::armor;
 use openpgp::Cert;
@@ -1256,3 +1262,454 @@ fn _pgpPubKeyLint(pkts: *const c_char,
         Err(Error::Fail(format!("Certificate {} is unusable", cert.keyid())))
     }
 });
+
+/// An optional OpenPGP certificate *and* an optional signature.
+///
+/// This data structure is deprecated and is scheduled for removal in
+/// rpm 4.19.
+pub struct PgpDig {
+    cert: Option<Box<PgpDigParams>>,
+    sig: Option<Box<PgpDigParams>>,
+}
+
+/// Dump the packets to stderr.
+///
+/// This is used by _pgpPrtPkts, which is deprecated and is scheduled
+/// for removal in rpm 4.19.  It is intended to be bug compatible with
+/// rpm's internal implementation.
+fn dump_packets(pkts: &[u8]) -> Result<()> {
+    use openpgp::types::CompressionAlgorithm;
+    use openpgp::types::KeyServerPreferences;
+    use openpgp::types::PublicKeyAlgorithm;
+    use openpgp::types::SignatureType;
+    use openpgp::types::SymmetricAlgorithm;
+    use openpgp::packet::signature::subpacket::Subpacket;
+    use openpgp::packet::signature::subpacket::SubpacketTag;
+    use openpgp::packet::signature::subpacket::SubpacketValue;
+
+    let mut ppr = PacketParser::from_bytes(pkts)?;
+
+    fn pk_algo(a: PublicKeyAlgorithm) -> &'static str {
+        use PublicKeyAlgorithm::*;
+        #[allow(deprecated)]
+        match a {
+            RSAEncryptSign => "RSA",
+            RSAEncrypt => "RSA(Encrypt-Only)",
+            RSASign => "RSA(Sign-Only)",
+            ElGamalEncrypt => "Elgamal(Encrypt-Only)",
+            DSA => "DSA",
+            ECDH => "Elliptic Curve",
+            ECDSA => "ECDSA",
+            ElGamalEncryptSign => "Elgamal",
+            EdDSA => "EdDSA",
+            _ => "Unknown public key algorithm",
+        }
+    }
+
+    fn sigtype(t: SignatureType) -> &'static str {
+        use SignatureType::*;
+        match t {
+            Binary => "Binary document signature",
+            Text => "Text document signature",
+            Standalone => "Standalone signature",
+            GenericCertification => "Generic certification of a User ID and Public Key",
+            PersonaCertification => "Persona certification of a User ID and Public Key",
+            CasualCertification => "Casual certification of a User ID and Public Key",
+            PositiveCertification => "Positive certification of a User ID and Public Key",
+            SubkeyBinding => "Subkey Binding Signature",
+            PrimaryKeyBinding => "Primary Key Binding Signature",
+            DirectKey => "Signature directly on a key",
+            KeyRevocation => "Key revocation signature",
+            SubkeyRevocation => "Subkey revocation signature",
+            CertificationRevocation => "Certification revocation signature",
+            Timestamp => "Timestamp signature",
+            _ => "Unknown signature type",
+        }
+    }
+
+    fn symalgo(a: SymmetricAlgorithm) -> &'static str {
+        use SymmetricAlgorithm::*;
+        match a {
+            Unencrypted => "Plaintext",
+            IDEA => "IDEA",
+            TripleDES => "3DES",
+            CAST5 => "CAST5",
+            Blowfish => "BLOWFISH",
+            AES128 => "AES(128-bit key)",
+            AES192 => "AES(192-bit key)",
+            AES256 => "AES(256-bit key)",
+            Twofish => "TWOFISH(256-bit key)",
+            _ => "Unknown symmetric key algorithm",
+        }
+    }
+
+    fn compalgo(a: CompressionAlgorithm) -> &'static str {
+        use CompressionAlgorithm::*;
+        match a {
+            Uncompressed => "Uncompressed",
+            Zip => "ZIP",
+            Zlib => "ZLIB",
+            BZip2 => "BZIP2",
+            _ => "Unknown compression algorithm",
+        }
+    }
+
+    fn ksprefs(prefs: KeyServerPreferences) -> &'static str {
+        // This is wrong, but this is what the internal implementation
+        // does.
+        if prefs.no_modify() {
+            "No-modify(128)"
+        } else if KeyServerPreferences::empty().normalized_eq(&prefs) {
+            ""
+        } else {
+            "Unknown key server preference"
+        }
+    }
+
+    fn subpacket(sp: &Subpacket) -> String {
+        let mut output: Vec<String> = Vec::new();
+
+        let tag = sp.tag();
+        let s = {
+            use SubpacketTag::*;
+            match tag {
+                SignatureCreationTime => "signature creation time",
+                SignatureExpirationTime => "signature expiration time",
+                ExportableCertification => "exportable certification",
+                TrustSignature => "trust signature",
+                RegularExpression => "regular expression",
+                Revocable => "revocable",
+                KeyExpirationTime => "key expiration time",
+                PlaceholderForBackwardCompatibility => "additional recipient request",
+                PreferredSymmetricAlgorithms => "preferred symmetric algorithms",
+                RevocationKey => "revocation key",
+                Issuer => "issuer key ID",
+                NotationData => "notation data",
+                PreferredHashAlgorithms => "preferred hash algorithms",
+                PreferredCompressionAlgorithms => "preferred compression algorithms",
+                KeyServerPreferences => "key server preferences",
+                PreferredKeyServer => "preferred key server",
+                PrimaryUserID => "primary user id",
+                PolicyURI => "policy URL",
+                KeyFlags => "key flags",
+                SignersUserID => "signer's user id",
+                ReasonForRevocation => "reason for revocation",
+                Features => "features",
+                EmbeddedSignature => "embedded signature",
+                _ => "Unknown signature subkey type",
+            }
+        };
+        output.push(s.into());
+
+        output.push(format!("({})", Into::<u8>::into(tag)));
+
+        if sp.critical() {
+            output.push(" *CRITICAL*".into());
+        }
+
+        {
+            use SubpacketValue::*;
+            match sp.value() {
+                PreferredSymmetricAlgorithms(algos) => {
+                    output.push(" ".into());
+                    output.push(
+                        algos.iter()
+                            .map(|a| {
+                                format!("{}({})",
+                                        symalgo(*a),
+                                        Into::<u8>::into(*a))
+                            })
+                            .collect::<Vec<String>>()
+                            .join(" "))
+                }
+                PreferredHashAlgorithms(algos) => {
+                    output.push(" ".into());
+                    output.push(
+                        algos.iter()
+                            .map(|a| {
+                                format!("{}({})",
+                                        a.to_string(),
+                                        Into::<u8>::into(*a))
+                            })
+                            .collect::<Vec<String>>()
+                            .join(" "))
+                }
+                PreferredCompressionAlgorithms(algos) => {
+                    output.push(" ".into());
+                    output.push(
+                        algos.iter()
+                            .map(|a| {
+                                format!("{}({})",
+                                        compalgo(*a),
+                                        Into::<u8>::into(*a))
+                            })
+                            .collect::<Vec<String>>()
+                            .join(" "))
+                }
+                KeyServerPreferences(prefs) => {
+                    output.push(format!(" {}", ksprefs(prefs.clone())))
+                }
+                SignatureExpirationTime(d)
+                    | KeyExpirationTime(d) =>
+                {
+                    // expiration time is an offset from the creation
+                    // time, but rpm's internal OpenPGP implementation
+                    // treats it as an absolute time.  As we're going
+                    // for bug-for-bug compatibility here, we do the
+                    // same.
+                    let t = NaiveDateTime::from_timestamp(
+                        d.as_secs() as i64, 0);
+                    let t = DateTime::<Utc>::from_utc(t, Utc);
+                    output.push(format!("  {}(0x{:08x})",
+                                        t.format("%c"),
+                                        d.as_secs()));
+                }
+
+                SignatureCreationTime(_)
+                    | Issuer(_)
+                    | KeyFlags(_) => (),
+
+                _ => {
+                    use sequoia_openpgp::serialize::MarshalInto;
+
+                    output.push(" ".into());
+                    output.extend(
+                        sp.value()
+                            .to_vec()
+                            .unwrap_or(Vec::new())
+                            .into_iter()
+                            .map(|b| format!("{:02x}", b)))
+                }
+            }
+        }
+
+        output.join("")
+    }
+
+    while let PacketParserResult::Some(pp) = ppr {
+        let (packet, next_ppr) = pp.recurse()?;
+        ppr = next_ppr;
+
+        // We only dump what rpm's internal OpenPGP implementation
+        // dumps.  Other packets we silently ignore.
+        match packet {
+            Packet::Signature(sig) => {
+                // V4 Signature(2) DSA(17) SHA512(10) Generic certification of a User ID and Public Key(16)
+                //     signature creation time(2)
+                //     issuer key ID(16)
+                //  signhash16 1418
+                eprintln!("V{} Signature(2) {}({}) {}({}) {}({})",
+                          sig.version(),
+                          pk_algo(sig.pk_algo()),
+                          Into::<u8>::into(sig.pk_algo()),
+                          sig.hash_algo().to_string(),
+                          Into::<u8>::into(sig.hash_algo()),
+                          sigtype(sig.typ()),
+                          Into::<u8>::into(sig.typ()));
+                sig.hashed_area().iter().for_each(|sb| {
+                    eprintln!("    {}", subpacket(sb));
+                });
+                sig.unhashed_area().iter().for_each(|sb| {
+                    eprintln!("    {}", subpacket(sb));
+                });
+
+                eprintln!(" signhash16 {:02x}{:02x}",
+                          sig.digest_prefix()[0],
+                          sig.digest_prefix()[1]);
+            },
+            Packet::PublicKey(key) => {
+                // V4 Public Key(6) RSA(1)  Tue Apr  7 08:52:57 2015(0x55239ae9)
+
+                let secs = key.creation_time()
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                let t: DateTime::<Utc> = key.creation_time().into();
+
+                eprintln!("V{} Public Key(6) {}({})  {}(0x{:08x})",
+                          key.version(),
+                          pk_algo(key.pk_algo()),
+                          Into::<u8>::into(key.pk_algo()),
+                          t.format("%c"), secs);
+            }
+            Packet::PublicSubkey(key) => {
+                // Public Subkey(14) 045523a696010...
+                use sequoia_openpgp::serialize::MarshalInto;
+
+                let secs = key.creation_time()
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+
+                eprintln!("Public Subkey(14) {:02}{:08x}{:02x}{}",
+                          key.version(), secs,
+                          Into::<u8>::into(key.pk_algo()),
+                          key.mpis().to_vec()
+                          .unwrap_or_else(|_| Vec::new())
+                          .into_iter()
+                          .map(|b| format!("{:02x}", b))
+                          .collect::<String>());
+            }
+            Packet::UserID(userid) => {
+                // User ID(13) "Neal H. Walfield <neal@walfield.org>"
+                eprintln!("User ID(13) {:?}",
+                          String::from_utf8_lossy(userid.value()));
+            }
+
+            Packet::Unknown(_pkt) => (),
+            Packet::OnePassSig(_ops) => (),
+            Packet::SecretKey(_key) => (),
+            Packet::SecretSubkey(_key) => (),
+            Packet::Marker(_marker) => (),
+            Packet::Trust(_trust) => (),
+            Packet::UserAttribute(_ua) => (),
+            Packet::Literal(_lit) => (),
+            Packet::CompressedData(_cd) => (),
+            Packet::PKESK(_pkesk) => (),
+            Packet::SKESK(_skesk) => (),
+            Packet::SEIP(_seip) => (),
+            Packet::MDC(_mdc) => (),
+            Packet::AED(_aed) => (),
+            _ => (),
+        }
+    }
+
+    Ok(())
+}
+
+ffi!(
+/// Parses and optionally prints to stdout a OpenPGP packet(s).
+///
+/// This function is deprecated and is scheduled for removal in rpm
+/// 4.19.
+///
+/// @param pkts		OpenPGP packet(s)
+/// @param pktlen	OpenPGP packet(s) length (no. of bytes)
+/// @param[out] dig	parsed output of signature/pubkey packet parameters
+/// @param printing	should packets be printed?
+///
+/// Returns 0 on success, -1 on failure.
+fn _pgpPrtPkts(pkts: *const u8, pktslen: size_t,
+               dig: *mut PgpDig, printing: c_int)
+    -> Binary
+{
+    let dig = check_mut!(dig);
+
+    let mut params: *mut PgpDigParams = std::ptr::null_mut();
+
+    if printing != 0 {
+        // We ignore any error here as this printing should not change
+        // the functions semantics.
+        let _ = dump_packets(check_slice!(pkts, pktslen));
+    }
+
+    let result = _pgpPrtParams(pkts, pktslen, 0, &mut params);
+    if result == -1 {
+        return Err(Error::Fail("Parse error".into()));
+    }
+
+    let params = claim_from_c!(params);
+    match params.obj {
+        PgpDigParamsObj::Cert(_) => dig.cert = Some(params),
+        PgpDigParamsObj::Subkey(_, _) => dig.cert = Some(params),
+        PgpDigParamsObj::Signature(_) => dig.sig = Some(params),
+    }
+
+    Ok(())
+});
+
+ffi!(
+/// Create a container for parsed OpenPGP packet(s).
+///
+/// This function is deprecated and is scheduled for removal in rpm
+/// 4.19.
+///
+/// @return		container
+fn _pgpNewDig() -> *mut PgpDig {
+    Ok(move_to_c!(PgpDig {
+        cert: None,
+        sig: None,
+    }))
+});
+
+ffi!(
+/// Release (malloc'd) data from container.
+///
+/// This function is deprecated and is scheduled for removal in rpm
+/// 4.19.
+///
+/// @param dig		container
+fn _pgpCleanDig(dig: *mut PgpDig) {
+    let dig = check_mut!(dig);
+    dig.cert = None;
+    dig.sig = None;
+});
+
+ffi!(
+/// Destroy a container for parsed OpenPGP packet(s).
+///
+/// This function is deprecated and is scheduled for removal in rpm
+/// 4.19.
+///
+/// @param dig		container
+/// @return		NULL always
+fn _pgpFreeDig(dig: Option<&mut PgpDig>) -> *mut PgpDig {
+    free!(dig);
+    Ok(std::ptr::null_mut())
+});
+
+ffi!(
+/// Retrieve parameters for parsed OpenPGP packet(s).
+///
+/// This function is deprecated and is scheduled for removal in rpm
+/// 4.19.
+///
+/// @param dig		container
+/// @param pkttype	type of params to retrieve (signature / pubkey)
+/// @return		pointer to OpenPGP parameters, NULL on error/not found
+fn _pgpDigGetParams(dig: *const PgpDig, pkttype: c_uint)
+    -> *const PgpDigParams
+{
+    let dig = check_ptr!(dig);
+
+    let ptr = match Tag::from(pkttype as u8) {
+        Tag::PublicKey => {
+            if let Some(ref cert) = dig.cert {
+                cert.as_ref()
+            } else {
+                std::ptr::null()
+            }
+        }
+        Tag::Signature => {
+            if let Some(ref sig) = dig.sig {
+                sig.as_ref()
+            } else {
+                std::ptr::null()
+            }
+        }
+        _ => {
+            std::ptr::null()
+        }
+    };
+
+    Ok(ptr)
+});
+
+ffi!(
+/// Verify a PGP signature.
+///
+/// This function is deprecated and is scheduled for removal in rpm
+/// 4.19.
+///
+/// @param dig		container
+/// @param hashctx	digest context
+/// @return 		RPMRC_OK on success
+fn _pgpVerifySig(dig: *const PgpDig,
+                 ctx: *const digest::DigestContext) -> ErrorCode {
+    Err(
+        _pgpVerifySignature(
+            _pgpDigGetParams(dig, u8::from(Tag::PublicKey) as u32),
+	    _pgpDigGetParams(dig, u8::from(Tag::Signature) as u32),
+            ctx).into())
+});
+
