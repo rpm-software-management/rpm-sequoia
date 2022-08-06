@@ -1051,7 +1051,7 @@ fn _pgpParsePkts(armor: *const c_char,
     *pkt = std::ptr::null_mut();
     let pktlen = check_mut!(pktlen);
 
-    let mut reader = armor::Reader::new(
+    let mut reader = armor::Reader::from_reader(
         std::io::BufReader::new(
             armor.to_str().map_err(|_| PgpArmorError::BodyDecode)?.as_bytes()),
         armor::ReaderMode::Tolerant(None));
