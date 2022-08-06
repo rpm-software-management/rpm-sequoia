@@ -38,6 +38,20 @@ impl From<Error> for ErrorCode {
     }
 }
 
+impl From<ErrorCode> for Error {
+    fn from(err: ErrorCode) -> Error {
+        match err {
+            0 => Error::Ok,
+            1 => Error::NotFound("<unspecified>".into()),
+            2 => Error::Fail("<unspecified>".into()),
+            3 => Error::NotTrusted("<unspecified>".into()),
+            4 => Error::NoKey("<unspecified>".into()),
+
+            _ => Error::Fail("<unspecified>".into()),
+        }
+    }
+}
+
 impl From<anyhow::Error> for Error {
     fn from(err: anyhow::Error) -> Error {
         Error::Fail(format!("{}", err))
