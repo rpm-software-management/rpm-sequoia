@@ -19,7 +19,7 @@ gitlab = { repository = "sequoia-pgp/rpm-sequoia" }
 [dependencies]
 anyhow = "1"
 buffered-reader = { version = "1", default-features = false }
-chrono = "0.4"
+chrono = { version = "0.4", default-features = false, features = [ "std" ] }
 lazy_static = "1"
 libc = "0.2"
 sequoia-openpgp = { version = "1.8", default-features = false }
