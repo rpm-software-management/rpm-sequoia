@@ -1585,7 +1585,7 @@ ffi!(
 ///
 /// @param pkts		OpenPGP packet(s)
 /// @param pktlen	OpenPGP packet(s) length (no. of bytes)
-/// @param[out] dig	parsed output of signature/pubkey packet parameters
+/// @param(out) dig	parsed output of signature/pubkey packet parameters
 /// @param printing	should packets be printed?
 ///
 /// Returns 0 on success, -1 on failure.
