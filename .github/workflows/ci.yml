@@ -1,0 +1,22 @@
+name: ci
+on:
+  push:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  compile:
+    name: Compile
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup | Checkout
+        uses: actions/checkout@v2
+      - name: Setup | Dependencies
+        run: sudo apt update && sudo apt install cargo clang git nettle-dev pkg-config libssl-dev
+      - name: Build | Compile
+        run: cargo build
+      - name: Build | Test
+        run: cargo test
+      - name: Build | Doc
+        run: cargo doc --no-deps
