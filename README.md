@@ -18,7 +18,7 @@ Here's how to build rpm-sequoia and a version of rpm that uses it:
 ```
 $ mkdir /tmp/rpm
 $ cd /tmp/rpm
-$ git clone git@gitlab.com:sequoia-pgp/rpm-sequoia.git
+$ git clone git@github.com:rpm-software-management/rpm-sequoia.git
 Cloning into 'rpm-sequoia'...
 done.
 $ cd rpm-sequoia
