@@ -6,6 +6,17 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  codespell:
+    name: Codespell
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Setup | Checkout
+        uses: actions/checkout@v2
+      - name: Setup | Dependencies
+        run: sudo apt update && sudo apt install codespell
+      - name: Codespell
+        run: codespell --version && codespell --config .codespellrc --summary
+
   compile:
     name: Compile
     runs-on: ubuntu-latest
