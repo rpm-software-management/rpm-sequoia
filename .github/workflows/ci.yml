@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: Setup | Checkout
         uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
 
       - name: Setup | Build Cache
         uses: actions/cache@v3
@@ -46,3 +48,6 @@ jobs:
 
       - name: Build | Doc
         run: cargo doc --no-deps
+
+      - name: Build | Test other commits
+        run: .ci/all_commits.sh
