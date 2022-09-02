@@ -12,11 +12,26 @@ jobs:
     steps:
       - name: Setup | Checkout
         uses: actions/checkout@v2
+
+      - name: Setup | Build Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
       - name: Setup | Dependencies
         run: sudo apt update && sudo apt install cargo clang git nettle-dev pkg-config libssl-dev
+
       - name: Build | Compile
         run: cargo build
+
       - name: Build | Test
         run: cargo test
+
       - name: Build | Doc
         run: cargo doc --no-deps
