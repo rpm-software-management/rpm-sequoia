@@ -70,6 +70,7 @@ use libc::{
     c_char,
     c_int,
     c_uint,
+    c_void,
     size_t,
 };
 
@@ -92,7 +93,12 @@ use openpgp::packet::{
     Signature,
     Tag,
 };
-use openpgp::parse::{PacketParser, PacketParserResult};
+use openpgp::parse::{
+    PacketParser,
+    PacketParserResult,
+    PacketParserBuilder,
+    Dearmor,
+};
 use openpgp::parse::Parse;
 use openpgp::policy::{
     StandardPolicy,
@@ -635,6 +641,57 @@ fn _pgpPubkeyKeyID(pkt: *const u8, pktlen: size_t, keyid: *mut u8)
     if let Some(k) = k {
         let buffer = check_mut_slice!(keyid, 8);
         buffer.copy_from_slice(k.as_bytes());
+
+        Ok(())
+    } else {
+        Err(Error::Fail("Not a key".into()))
+    }
+});
+
+ffi!(
+/// Calculate OpenPGP public key fingerprint.
+///
+/// Returns -1 if `pkt` is not a public key or secret key.
+///
+/// Note: this function does not handle public subkeys or secret
+/// subkeys!
+///
+/// `*fprout` is allocated using `malloc` and must be allocated by the
+/// caller.
+///
+/// Returns 0 on success and -1 on failure.
+fn _pgpPubkeyFingerprint(pkt: *const u8, pktlen: size_t,
+                         fprout: *mut *mut u8, fprlen: *mut size_t)
+     -> Binary
+{
+    let pkt = check_slice!(pkt, pktlen);
+
+    let ppr = PacketParserBuilder::from_bytes(pkt)?
+        .dearmor(Dearmor::Disabled) // Disable dearmoring.
+        .build()?;
+    let fpr = if let PacketParserResult::Some(ref pp) = ppr {
+        match &pp.packet {
+            Packet::PublicKey(key) => Some(key.fingerprint()),
+            Packet::SecretKey(key) => Some(key.fingerprint()),
+            _ => None,
+        }
+    } else {
+        None
+    };
+
+    t!("Fingerprint: {}",
+       fpr.as_ref()
+           .map(|fpr| fpr.to_string())
+           .unwrap_or_else(|| String::from("none")));
+
+    if let Some(fpr) = fpr {
+        let fpr = fpr.as_bytes();
+        unsafe {
+            let buffer = libc::malloc(fpr.len());
+            libc::memcpy(buffer, fpr.as_ptr() as *const c_void, fpr.len());
+            *fprout = buffer as *mut u8;
+            *fprlen = fpr.len();
+        }
 
         Ok(())
     } else {
