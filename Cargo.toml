@@ -29,6 +29,9 @@ thiserror = "1"
 anyhow = "1"
 cdylib-link-lines = "0.1.4"
 
+[dev-dependencies]
+assert_cmd = "2.0"
+
 [lib]
 crate-type = ["cdylib"]
 

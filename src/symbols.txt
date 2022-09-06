@@ -1,0 +1,50 @@
+# #include <rpm/rpmpgp.h>
+# Implemented by rpmpgp.c.
+# pgpValString
+_pgpPubkeyFingerprint
+_pgpPubkeyKeyID
+_pgpPrtParams
+_pgpPrtParamsSubkeys
+_pgpPrtPkts
+# Implemented by rpmpgp.c.
+# pgpReadPkts
+_pgpParsePkts
+_pgpPubKeyCertLen
+_pgpPubKeyLint
+_pgpArmorWrap
+_pgpNewDig
+_pgpCleanDig
+_pgpFreeDig
+_pgpDigGetParams
+_pgpDigParamsCmp
+_pgpDigParamsAlgo
+_pgpDigParamsSignID
+_pgpDigParamsUserID
+_pgpDigParamsVersion
+_pgpDigParamsCreationTime
+_pgpDigParamsFree
+_pgpVerifySignature
+_pgpVerifySig
+_pgpSignatureType
+# Implemented by rpmpgp.c.
+# pgpIdentItem
+
+# #include <rpm/rpmcrypto.h>
+_rpmInitCrypto
+_rpmFreeCrypto
+_rpmDigestDup
+_rpmDigestLength
+_rpmDigestInit
+_rpmDigestUpdate
+_rpmDigestFinal
+# These are implemented in terms of the above.
+#
+# rpmDigestBundleFree
+# rpmDigestBundleAdd
+# rpmDigestBundleAddID
+# rpmDigestBundleUpdate
+# rpmDigestBundleDupCtx
+
+# Threse symbols are exposed by Rust :/
+# See: https://gitlab.com/sequoia-pgp/rpm-sequoia/-/issues/3
+rust_eh_personality
