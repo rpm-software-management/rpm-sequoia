@@ -5,7 +5,7 @@ This is a checklist for doing releases.
   1. Bump the version in README.md to XXX.
   1. Make a commit with the message "Release XXX.".
   1. cd /tmp && git clone ~/.../rpm-sequoia && cd rpm-sequoia && cargo publish --dry-run
-  1. Push to gitlab, and create a merge request.  Don't auto merge!!!
+  1. Push to github, and create a merge request.  Don't auto merge!!!
   1. Make a tag vXXX with the message "Release XXX." signed with an
      offline-key.
   1. In case of errors, correct them, and go back to the step creating
