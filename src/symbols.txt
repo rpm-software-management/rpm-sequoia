@@ -47,4 +47,5 @@ _rpmDigestFinal
 
 # Threse symbols are exposed by Rust :/
 # See: https://gitlab.com/sequoia-pgp/rpm-sequoia/-/issues/3
-rust_eh_personality
+?rust_eh_personality
+

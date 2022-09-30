@@ -72,13 +72,22 @@ fn symbols() -> anyhow::Result<()> {
         if symbol.is_empty() {
             continue;
         }
-        expected_symbols.push(symbol);
+        if symbol.chars().nth(0) == Some('?') {
+            expected_symbols.push((&symbol[1..], true));
+        } else {
+            expected_symbols.push((symbol, true));
+        }
     }
     expected_symbols.sort();
 
     eprintln!("Expected {} symbols:", expected_symbols.len());
-    for symbol in expected_symbols.iter() {
-        eprintln!("  {}", symbol);
+    for (symbol, optional) in expected_symbols.iter() {
+        eprint!("  {}", symbol);
+        if *optional {
+            eprint!(" (optional)");
+        } else {
+            eprint!("");
+        }
     }
 
     let mut i = 0;
@@ -91,13 +100,13 @@ fn symbols() -> anyhow::Result<()> {
 
         if i < symbols.len()
             && j < expected_symbols.len()
-            && symbols[i] == expected_symbols[j]
+            && symbols[i] == expected_symbols[j].0
         {
             i += 1;
             j += 1;
         } else if (i < symbols.len()
                    && j < expected_symbols.len()
-                   && symbols[i] < expected_symbols[j])
+                   && symbols[i] < expected_symbols[j].0)
             || j == expected_symbols.len()
         {
             eprintln!("Found unexpected symbol {}", symbols[i]);
@@ -105,12 +114,14 @@ fn symbols() -> anyhow::Result<()> {
             bad = true;
         } else if (i < symbols.len()
                    && j < expected_symbols.len()
-                   && symbols[i] > expected_symbols[j])
+                   && symbols[i] > expected_symbols[j].0)
             || i == symbols.len()
         {
-            eprintln!("Missing expected symbol {}", expected_symbols[j]);
+            if ! expected_symbols[j].1 {
+                eprintln!("Missing expected symbol {}", expected_symbols[j].0);
+                bad = true;
+            }
             j += 1;
-            bad = true;
         } else {
             unreachable!();
         }
