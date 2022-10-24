@@ -14,7 +14,6 @@ build = "build.rs"
 
 [badges]
 maintenance = { status = "actively-developed" }
-gitlab = { repository = "sequoia-pgp/rpm-sequoia" }
 
 [dependencies]
 anyhow = "1"
