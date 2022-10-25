@@ -84,9 +84,9 @@ fn symbols() -> anyhow::Result<()> {
     for (symbol, optional) in expected_symbols.iter() {
         eprint!("  {}", symbol);
         if *optional {
-            eprint!(" (optional)");
+            eprintln!(" (optional)");
         } else {
-            eprint!("");
+            eprintln!("");
         }
     }
 
