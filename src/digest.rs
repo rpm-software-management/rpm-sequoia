@@ -37,18 +37,6 @@ impl DigestContext {
 }
 
 ffi!(
-/// int rpmInitCrypto(void)
-fn _rpmInitCrypto() -> Binary {
-    Ok(())
-});
-
-ffi!(
-/// int rpmFreeCrypto(void)
-fn _rpmFreeCrypto() -> Binary {
-    Ok(())
-});
-
-ffi!(
 /// DIGEST_CTX rpmDigestInit(int hashalgo, rpmDigestFlags flags)
 ///
 /// rpmDigestFlags currently does not define any flags.

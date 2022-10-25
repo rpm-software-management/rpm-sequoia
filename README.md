@@ -5,6 +5,22 @@ interface] using [Sequoia].
   [pgp interface]: https://github.com/rpm-software-management/rpm/blob/master/include/rpm/rpmpgp.h
   [Sequoia]: https://sequoia-pgp.org
 
+# Configuration
+
+This library reads the [crypto policy configuration] in
+`/etc/crypto-policies/back-ends/sequoia.config`.  This can be
+overridden using the `SEQUOIA_CRYPTO_POLICY` environment variable.  If
+set to the empty string, then no crypto policy will be read and
+instead [Sequoia's default policy] will be used.
+
+Refer to the [Fedora Crypto Policy] project for information about the
+crypto policy.
+
+  [crypto policy configuration]: https://docs.rs/sequoia-policy-config/latest/sequoia_policy_config/
+  [Sequoia's default policy]: https://docs.sequoia-pgp.org/sequoia_openpgp/policy/struct.StandardPolicy.html
+  [Fedora Crypto Policy]: https://gitlab.com/redhat-crypto/fedora-crypto-policies/
+
+
 # Building
 
 To build, you need [rustc] (version 1.60 or later), cargo, and
