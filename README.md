@@ -7,8 +7,9 @@ interface] using [Sequoia].
 
 # Building
 
-To build, you need [rustc], cargo and [nettle-devel], which is the
-cryptographic library, which Sequoia uses by default.
+To build, you need [rustc] (version 1.60 or later), cargo, and
+[nettle-devel], which is the cryptographic library that Sequoia uses
+by default.
 
   [rustc]: https://packages.fedoraproject.org/pkgs/rust/rust/
   [nettle-devel]: https://packages.fedoraproject.org/pkgs/nettle/nettle-devel
