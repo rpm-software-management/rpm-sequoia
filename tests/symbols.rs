@@ -75,7 +75,7 @@ fn symbols() -> anyhow::Result<()> {
         if symbol.chars().nth(0) == Some('?') {
             expected_symbols.push((&symbol[1..], true));
         } else {
-            expected_symbols.push((symbol, true));
+            expected_symbols.push((symbol, false));
         }
     }
     expected_symbols.sort();
