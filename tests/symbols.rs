@@ -110,6 +110,9 @@ fn symbols() -> anyhow::Result<()> {
             || j == expected_symbols.len()
         {
             eprintln!("Found unexpected symbol {}", symbols[i]);
+            if symbols[i] == "bz_internal_error" {
+                eprintln!("  It looks like you forgot to disable compression.")
+            }
             i += 1;
             bad = true;
         } else if (i < symbols.len()
