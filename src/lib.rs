@@ -57,6 +57,7 @@ use std::ffi::{
 use std::fmt::Debug;
 use std::io::Read;
 use std::io::Write;
+use std::sync::RwLock;
 use std::time::{
     Duration,
     SystemTime,
@@ -118,7 +119,9 @@ use rpm::{
 };
 pub mod digest;
 
-const P: &StandardPolicy = &StandardPolicy::new();
+lazy_static::lazy_static! {
+    static ref P: RwLock<StandardPolicy<'static>> = RwLock::new(StandardPolicy::new());
+}
 
 // Set according to the RPM_TRACE environment variable (enabled if
 // non-zero), or if we are built in debug mode.
@@ -292,7 +295,7 @@ fn _pgpDigParamsAlgo(dig: *const PgpDigParams,
 
         // hash algo.
         (PGPVAL_HASHALGO, PgpDigParamsObj::Cert(cert)) => {
-            match cert.with_policy(P, None) {
+            match cert.with_policy(&*P.read().unwrap(), None) {
                 Ok(vc) => {
                     let algo = vc.primary_key().binding_signature().hash_algo();
                     Ok(u8::from(algo).into())
@@ -305,7 +308,7 @@ fn _pgpDigParamsAlgo(dig: *const PgpDigParams,
         }
         (PGPVAL_HASHALGO, PgpDigParamsObj::Subkey(_, fpr)) => {
             let ka = dig.key().expect("valid");
-            match ka.with_policy(P, None) {
+            match ka.with_policy(&*P.read().unwrap(), None) {
                 Ok(ka) => {
                     let algo = ka.binding_signature().hash_algo();
                     Ok(u8::from(algo).into())
@@ -488,7 +491,7 @@ fn _pgpVerifySignature(key: *const PgpDigParams,
         return Err(Error::Fail(format!("signature invalid: {}", err)));
     }
 
-    if let Err(err) = P.signature(sig, Default::default()) {
+    if let Err(err) = P.read().unwrap().signature(sig, Default::default()) {
         return Err(Error::Fail(
             format!("signature invalid: policy violation: {}", err)));
     }
@@ -502,7 +505,8 @@ fn _pgpVerifySignature(key: *const PgpDigParams,
 
         // We evaluate the certificate as of the signature creation
         // time.
-        let vc = cert.with_policy(P, sig_time)?;
+        let p = &*P.read().unwrap();
+        let vc = cert.with_policy(p, sig_time)?;
 
         if let Err(err) = vc.alive() {
             return Err(Error::Fail(
@@ -980,7 +984,9 @@ fn _pgpPrtParams(pkts: *const u8, pktlen: size_t,
 
                 let keyid = cert.keyid().as_bytes().to_vec();
 
-                let userid = if let Ok(vc) = cert.with_policy(P, None) {
+                let userid = if let Ok(vc)
+                    = cert.with_policy(&*P.read().unwrap(), None)
+                {
                     vc.primary_userid()
                         .ok()
                         .and_then(|u| {
@@ -1060,7 +1066,7 @@ fn _pgpPrtParamsSubkeys(pkts: *const u8, pktlen: size_t,
         _ => return Err(Error::Fail("Not an OpenPGP message".into())),
     };
 
-    let userid = if let Ok(vc) = cert.with_policy(P, None) {
+    let userid = if let Ok(vc) = cert.with_policy(&*P.read().unwrap(), None) {
         vc.primary_userid()
             .ok()
             .and_then(|u| {
@@ -1180,7 +1186,7 @@ fn _pgpPubKeyLint(pkts: *const c_char,
     };
 
     let usable = 'done : loop {
-        match cert.with_policy(P, None) {
+        match cert.with_policy(&*P.read().unwrap(), None) {
             Err(err) => {
                 lint(&format!("Policy rejects {}: {}", cert.keyid(), err));
                 break 'done false;
@@ -1228,7 +1234,7 @@ fn _pgpPubKeyLint(pkts: *const c_char,
         for ka in cert.keys() {
             let keyid = ka.keyid();
 
-            match ka.with_policy(P, None) {
+            match ka.with_policy(&*P.read().unwrap(), None) {
                 Err(err) => {
                     lint(&format!("Policy rejects subkey {}: {}",
                                   keyid, err));
