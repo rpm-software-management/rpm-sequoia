@@ -43,6 +43,20 @@ $ make
 $ make check
 ```
 
+To use a different cryptographic backend, you need to disable the
+default backend, and select your preferred backend.  For instance, to
+use Sequoia's OpenSSL backend, you would compile `rpm-sequoia` as
+follows:
+
+```
+$ cargo build --release --no-default-features --features sequoia-openpgp/crypto-openssl
+```
+
+See [`sequoia-openpgp`'s README] for the list of currently supported
+cryptographic backends.
+
+  [`sequoia-openpgp`'s README]: https://gitlab.com/sequoia-pgp/sequoia#features
+
 The rpm-sequoia artifacts (the .a, .so, and the .pc files) are placed
 in the build directory, which, in this case, is
 `/tmp/rpm/rpm-sequoia/target/release`.  We also set the `PREFIX`

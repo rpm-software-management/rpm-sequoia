@@ -36,9 +36,12 @@ assert_cmd = "2.0"
 crate-type = ["cdylib"]
 
 [features]
+# To use a different cryptographic backend, e.g., OpenSSL, do:
+#
+#   cargo build --release --no-default-features --features sequoia-openpgp/crypto-openssl
+
+# We explicitly do not want to enable Sequoia's decompression support.
+# Hence we only select a crypto backend.
 default = [
-    # We explicitly do not want to enable Sequoia's decompression support.
-    "crypto-nettle",
+    "sequoia-openpgp/crypto-nettle",
 ]
-crypto-nettle = ["sequoia-openpgp/crypto-nettle"]
-crypto-cng = ["sequoia-openpgp/crypto-cng"]
