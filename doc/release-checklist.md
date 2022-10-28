@@ -3,6 +3,7 @@ This is a checklist for doing releases.
   1. Start from origin/main, create a branch 'release'
   1. Bump the version in Cargo.toml to XXX.
   1. Bump the version in README.md to XXX.
+  1. Compile the project and check in any changes to Cargo.lock.
   1. Make a commit with the message "Release XXX.".
   1. cd /tmp && git clone ~/.../rpm-sequoia && cd rpm-sequoia && cargo publish --dry-run
   1. Push to github, and create a merge request.  Don't auto merge!!!
