@@ -47,6 +47,8 @@ $ cd /tmp/rpm
 $ git clone git@github.com:rpm-software-management/rpm.git
 Cloning into 'rpm'...
 done.
+$ git checkout -b rpm-4.18.0-release
+Switched to a new branch 'rpm-4.18.0-release'
 $ cd rpm
 $ autoreconf -fis
 ...
@@ -58,6 +60,13 @@ $ ../configure --with-crypto=sequoia
 $ make
 $ make check
 ```
+
+Note: this builds version 4.18 of `rpm`, which is the current stable
+release of `rpm`.  The current development branch of `rpm` has
+switched to using `cmake` instead of `autoconf`.  Please refer to
+[rpm's `INSTALL`] file for how to build `master`.
+
+  [rpm's `INSTALL`]: https://github.com/rpm-software-management/rpm/blob/master/INSTALL
 
 To use a different cryptographic backend, you need to disable the
 default backend, and select your preferred backend.  For instance, to
