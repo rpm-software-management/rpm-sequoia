@@ -47,9 +47,9 @@ $ cd /tmp/rpm
 $ git clone git@github.com:rpm-software-management/rpm.git
 Cloning into 'rpm'...
 done.
-$ git checkout -b rpm-4.18.0-release
-Switched to a new branch 'rpm-4.18.0-release'
 $ cd rpm
+$ git checkout rpm-4.18.0-release
+Switched to a new branch 'rpm-4.18.0-release'
 $ autoreconf -fis
 ...
 $ mkdir b
