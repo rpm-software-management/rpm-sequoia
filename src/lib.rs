@@ -193,7 +193,7 @@ fn _rpmInitCrypto() -> Binary {
     }
 
     let mut p = sequoia_policy_config::ConfiguredStandardPolicy::new();
-    if let Err(err) = p.from_bytes(config) {
+    if let Err(err) = p.parse_bytes(config) {
         eprintln!("Error parsing {:?}: {}", crypto_policy, err);
         return Err(anyhow::anyhow!(
             "Error parsing {:?}: {}", crypto_policy, err).into());
