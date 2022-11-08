@@ -70,11 +70,8 @@ use std::ffi::{
     CString,
 };
 use std::fmt::Debug;
-use std::fs::File;
-use std::io;
 use std::io::Read;
 use std::io::Write;
-use std::path::PathBuf;
 use std::sync::RwLock;
 use std::time::{
     Duration,
@@ -154,54 +151,16 @@ lazy_static::lazy_static! {
     };
 }
 
-const CRYPTO_POLICY: &'static str
-    = "/etc/crypto-policies/back-ends/sequoia.config";
-
 ffi!(
 /// int rpmInitCrypto(void)
 fn _rpmInitCrypto() -> Binary {
-    let crypto_policy = if let Ok(f) = env::var("SEQUOIA_CRYPTO_POLICY") {
-        if f.is_empty() {
-            // Empty means don't read anything.
-            return Ok(());
-        } else {
-            PathBuf::from(f)
-        }
-    } else {
-        PathBuf::from(CRYPTO_POLICY)
-    };
-
-    let mut f = match File::open(&crypto_policy) {
-        Ok(f) => f,
-        Err(err) if err.kind() == io::ErrorKind::NotFound => {
-            // There is no configuration.  That's fine.
-            return Ok(());
-        }
-        Err(err) => {
-            eprintln!("Error opening {:?}: {}", crypto_policy, err);
-            return Err(anyhow::anyhow!(
-                "Error opening {:?}: {}", crypto_policy, err).into());
-        }
-    };
-
-    let mut config = Vec::new();
-    if let Err(err) = f.read_to_end(&mut config) {
-        eprintln!("Error reading {:?}: {}",
-                  crypto_policy, err);
-        return Err(anyhow::anyhow!(
-            "Error reading {:?}: {}", crypto_policy, err).into());
-    }
-
     let mut p = sequoia_policy_config::ConfiguredStandardPolicy::new();
-    if let Err(err) = p.parse_bytes(config) {
-        eprintln!("Error parsing {:?}: {}", crypto_policy, err);
-        return Err(anyhow::anyhow!(
-            "Error parsing {:?}: {}", crypto_policy, err).into());
+    if let Err(err) = p.parse_default_config() {
+        eprintln!("Reading configuration: {}", err);
+        return Err(err.into());
     }
 
-    let p = p.build();
-
-    *crate::P.write().unwrap() = p;
+    *crate::P.write().unwrap() = p.build();
 
     Ok(())
 });
