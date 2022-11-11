@@ -595,35 +595,49 @@ fn _pgpVerifySignature(key: *const PgpDigParams,
         use openpgp::serialize::Marshal;
         use openpgp::serialize::MarshalInto;
 
-        // Hash the signature into the context.
-        if sig.version() != 4 {
-            return Err(Error::Fail(
-                format!("Unsupported signature version: {}", sig.version())));
-        }
-
         // See https://datatracker.ietf.org/doc/html/rfc4880#section-5.2.4
         let mut sig_data = Vec::with_capacity(128);
 
-        sig_data.push(sig.version());
-        sig_data.push(sig.typ().into());
-        sig_data.push(sig.pk_algo().into());
-        sig_data.push(sig.hash_algo().into());
+        // Hash the signature into the context.
+        match sig.version() {
+            4 => {
+                sig_data.push(sig.version());
+                sig_data.push(sig.typ().into());
+                sig_data.push(sig.pk_algo().into());
+                sig_data.push(sig.hash_algo().into());
 
-        let l = sig.hashed_area().serialized_len() as u16;
-        sig_data.push((l >> 8) as u8);
-        sig_data.push((l >> 0) as u8);
+                let l = sig.hashed_area().serialized_len() as u16;
+                sig_data.push((l >> 8) as u8);
+                sig_data.push((l >> 0) as u8);
 
-        sig.hashed_area().serialize(&mut sig_data).expect("vec");
+                sig.hashed_area().serialize(&mut sig_data).expect("vec");
 
-        let sig_len = sig_data.len();
+                let sig_len = sig_data.len();
 
-        // Trailer.
-        sig_data.push(sig.version());
-        sig_data.push(0xFF);
-        sig_data.push((sig_len >> 24) as u8);
-        sig_data.push((sig_len >> 16) as u8);
-        sig_data.push((sig_len >>  8) as u8);
-        sig_data.push((sig_len >>  0) as u8);
+                // Trailer.
+                sig_data.push(sig.version());
+                sig_data.push(0xFF);
+                sig_data.push((sig_len >> 24) as u8);
+                sig_data.push((sig_len >> 16) as u8);
+                sig_data.push((sig_len >>  8) as u8);
+                sig_data.push((sig_len >>  0) as u8);
+            }
+            3 => {
+                sig_data.push(sig.typ().into());
+                let ct = sig.signature_creation_time().unwrap_or(UNIX_EPOCH);
+                let ct = ct.duration_since(UNIX_EPOCH)
+                    .map_err(|_| Error::Fail("time".into()))?
+                    .as_secs() as u32;
+                sig_data.push((ct >> 24) as u8);
+                sig_data.push((ct >> 16) as u8);
+                sig_data.push((ct >>  8) as u8);
+                sig_data.push((ct >>  0) as u8);
+            }
+            v => {
+                return Err(Error::Fail(
+                    format!("Unsupported signature version: {}", v)));
+            }
+        }
 
         ctx.update(&sig_data);
 
