@@ -651,6 +651,8 @@ fn _pgpVerifySignature(key: *const PgpDigParams,
         let p = sig.digest_prefix();
         if p[0] != digest[0] || p[1] != digest[1] {
             return Err(Error::Fail("digest prefix mismatch".into()));
+        } else {
+            t!("digest prefix matches");
         }
 
         return Err(Error::NoKey(
