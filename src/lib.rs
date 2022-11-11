@@ -531,6 +531,13 @@ fn _pgpVerifySignature(key: *const PgpDigParams,
             format!("signature invalid: policy violation: {}", err)));
     }
 
+    // XXX: rpm only cares about the first issuer
+    // subpacket.
+    let issuer = match sig.get_issuers().into_iter().next() {
+        Some(issuer) => issuer,
+        None => return Err(Error::Fail("No issuer".into())),
+    };
+
     if let Some(key) = key {
         // Actually verify the signature.
         let cert = key.cert().ok_or_else(|| {
@@ -551,13 +558,6 @@ fn _pgpVerifySignature(key: *const PgpDigParams,
             return Err(Error::Fail(
                 format!("key invalid: certificate is revoked")));
         }
-
-        // XXX: rpm only cares about the first issuer
-        // subpacket.
-        let issuer = match sig.get_issuers().into_iter().next() {
-            Some(issuer) => issuer,
-            None => return Err(Error::Fail("No issuer".into())),
-        };
 
         // Find the key.
         match vc.keys().key_handle(issuer.clone()).next() {
@@ -653,7 +653,8 @@ fn _pgpVerifySignature(key: *const PgpDigParams,
             return Err(Error::Fail("digest prefix mismatch".into()));
         }
 
-        return Err(Error::NoKey("Not provided".into()));
+        return Err(Error::NoKey(
+            format!("Not provided (issuer: {})", issuer).into()));
     }
 });
 
