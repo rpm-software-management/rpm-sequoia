@@ -1572,8 +1572,14 @@ fn dump_packets(pkts: &[u8]) -> Result<()> {
                     // treats it as an absolute time.  As we're going
                     // for bug-for-bug compatibility here, we do the
                     // same.
-                    let t = NaiveDateTime::from_timestamp(
-                        d.as_secs() as i64, 0);
+                    let t = NaiveDateTime::from_timestamp_opt(
+                        d.as_secs() as i64, 0)
+                        .unwrap_or_else(|| {
+                            // This is just compatibility, debugging
+                            // output.  Fallback to the unix epoch.
+                            NaiveDateTime::from_timestamp_opt(0, 0)
+                                .expect("valid")
+                        });
                     let t = DateTime::<Utc>::from_utc(t, Utc);
                     output.push(format!("  {}(0x{:08x})",
                                         t.format("%c"),
