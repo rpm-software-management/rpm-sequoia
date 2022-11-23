@@ -154,7 +154,19 @@ lazy_static::lazy_static! {
 ffi!(
 /// int rpmInitCrypto(void)
 fn _rpmInitCrypto() -> Binary {
-    let mut p = sequoia_policy_config::ConfiguredStandardPolicy::new();
+    // XXX: Remove this once v4 signatures are ubiquitous.
+    //
+    // Unfortunately, much of the rpm ecosystem is still (2022)
+    // generating v3 signatures.  As they aren't completely broken,
+    // accept them by default, but still let them be overridden by the
+    // system policy.
+    //
+    // See https://bugzilla.redhat.com/show_bug.cgi?id=2141686
+    let mut p = openpgp::policy::StandardPolicy::new();
+    p.accept_packet_tag_version(openpgp::packet::Tag::Signature, 3);
+
+    let mut p = sequoia_policy_config::ConfiguredStandardPolicy
+        ::from_policy(p);
     if let Err(err) = p.parse_default_config() {
         eprintln!("Reading configuration: {}", err);
         return Err(err.into());
