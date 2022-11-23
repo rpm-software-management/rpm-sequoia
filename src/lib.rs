@@ -526,9 +526,20 @@ fn _pgpVerifySignature(key: *const PgpDigParams,
         return Err(Error::Fail(format!("signature invalid: {}", err)));
     }
 
-    if let Err(err) = P.read().unwrap().signature(sig, Default::default()) {
-        return Err(Error::Fail(
-            format!("signature invalid: policy violation: {}", err)));
+    {
+        let policy = P.read().unwrap();
+        if let Err(err) = policy.signature(sig, Default::default()) {
+            return Err(Error::Fail(
+                format!("signature invalid: policy violation: {}", err)));
+        }
+        // XXX: As of sequoia-openpgp v1.11.0, this check is not done
+        // by `policy.signature` (see issue #953).  We do it manually,
+        // but once rpm-sequoia depends on a newer version of
+        // sequoia-openpgp that does this, remove this code.
+        if let Err(err) = policy.packet(&Packet::from(sig.clone())) {
+            return Err(Error::Fail(
+                format!("signature invalid: policy violation: {}", err)));
+        }
     }
 
     // XXX: rpm only cares about the first issuer
