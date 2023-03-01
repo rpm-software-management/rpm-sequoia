@@ -117,6 +117,7 @@ use openpgp::parse::{
 };
 use openpgp::parse::Parse;
 use openpgp::policy::{
+    NullPolicy,
     StandardPolicy,
     Policy,
 };
@@ -137,6 +138,7 @@ pub mod digest;
 lazy_static::lazy_static! {
     static ref P: RwLock<StandardPolicy<'static>> = RwLock::new(StandardPolicy::new());
 }
+const NP: &NullPolicy = &NullPolicy::new();
 
 // Set according to the RPM_TRACE environment variable (enabled if
 // non-zero), or if we are built in debug mode.
@@ -523,6 +525,8 @@ fn _pgpVerifySignature(key: *const PgpDigParams,
     // This function MUST NOT free or even change ctx.
     let mut ctx = check_ptr!(ctx).clone();
 
+    let mut legacy = false;
+
     let sig = sig.signature().ok_or_else(|| {
         Error::Fail("sig is not a signature".into())
     })?;
@@ -541,16 +545,26 @@ fn _pgpVerifySignature(key: *const PgpDigParams,
     {
         let policy = P.read().unwrap();
         if let Err(err) = policy.signature(sig, Default::default()) {
-            return Err(Error::Fail(
-                format!("signature invalid: policy violation: {}", err)));
+            if NP.signature(sig, Default::default()).is_ok() {
+                t!("signature uses legacy cryptography: {}", err);
+                legacy = true;
+            } else {
+                return Err(Error::Fail(
+                    format!("signature invalid: policy violation: {}", err)));
+            }
         }
         // XXX: As of sequoia-openpgp v1.11.0, this check is not done
         // by `policy.signature` (see issue #953).  We do it manually,
         // but once rpm-sequoia depends on a newer version of
         // sequoia-openpgp that does this, remove this code.
         if let Err(err) = policy.packet(&Packet::from(sig.clone())) {
-            return Err(Error::Fail(
-                format!("signature invalid: policy violation: {}", err)));
+            if NP.packet(&Packet::from(sig.clone())).is_ok() {
+                t!("signature uses legacy cryptography: {}", err);
+                legacy = true;
+            } else {
+                return Err(Error::Fail(
+                    format!("signature invalid: policy violation: {}", err)));
+            }
         }
     }
 
@@ -571,7 +585,23 @@ fn _pgpVerifySignature(key: *const PgpDigParams,
         // We evaluate the certificate as of the signature creation
         // time.
         let p = &*P.read().unwrap();
-        let vc = cert.with_policy(p, sig_time)?;
+        let vc = cert.with_policy(p, sig_time)
+            .or_else(|err| {
+                t!("certificate {} ({}) uses legacy cryptography: {}",
+                   cert.keyid(),
+                   cert.userids().next()
+                       .map(|userid| {
+                           String::from_utf8_lossy(userid.value()).into_owned()
+                       })
+                       .unwrap_or_else(|| {
+                           "<unknown>".into()
+                       }),
+                   err);
+                legacy = true;
+                cert.with_policy(NP, sig_time)
+                    // Prefer the original error.
+                    .map_err(|_np_err| err)
+            })?;
 
         if let Err(err) = vc.alive() {
             return Err(Error::Fail(
@@ -600,7 +630,12 @@ fn _pgpVerifySignature(key: *const PgpDigParams,
                 } else {
                     // Finally we can verify the signature.
                     sig.clone().verify_hash(&ka, ctx.ctx.clone())?;
-                    return Ok(());
+                    if legacy {
+                        return Err(Error::NotTrusted(
+                            "verification relies on legacy crypto".into()));
+                    } else {
+                        return Ok(());
+                    }
                 }
             }
             None => {
