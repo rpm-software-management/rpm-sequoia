@@ -604,12 +604,14 @@ fn _pgpVerifySignature(key: *const PgpDigParams,
             })?;
 
         if let Err(err) = vc.alive() {
-            return Err(Error::Fail(
-                format!("key invalid: not alive: {}", err)));
+            legacy = true;
+            t!("{} is invalid: not alive: {}",
+               vc.fingerprint(), err);
         }
         if let RevocationStatus::Revoked(_) = vc.revocation_status() {
-            return Err(Error::Fail(
-                format!("key invalid: certificate is revoked")));
+            legacy = true;
+            t!("{} is invalid: certificate is revoked",
+               vc.fingerprint());
         }
 
         // Find the key.
@@ -618,24 +620,29 @@ fn _pgpVerifySignature(key: *const PgpDigParams,
                 if ka.fingerprint() != subkey {
                     return Err(Error::Fail(
                         format!("key invalid: wrong subkey")));
-                } else if ! ka.for_signing() {
+                }
+                if ! ka.for_signing() {
                     return Err(Error::Fail(
                         format!("key invalid: key is not signing capable")));
-                } else if let Err(err) = ka.alive() {
-                    return Err(Error::Fail(
-                        format!("key invalid: key is not alive: {}", err)));
-                } else if let RevocationStatus::Revoked(_) = ka.revocation_status() {
-                    return Err(Error::Fail(
-                        format!("key invalid: key is revoked")));
+                }
+                if let Err(err) = ka.alive() {
+                    legacy = true;
+                    t!("{} is invalid: key is not alive: {}",
+                       vc.fingerprint(), err);
+                }
+                if let RevocationStatus::Revoked(_) = ka.revocation_status() {
+                    legacy = true;
+                    t!("{} is invalid: key is revoked",
+                       vc.fingerprint());
+                }
+
+                // Finally we can verify the signature.
+                sig.clone().verify_hash(&ka, ctx.ctx.clone())?;
+                if legacy {
+                    return Err(Error::NotTrusted(
+                        "verification relies on legacy crypto".into()));
                 } else {
-                    // Finally we can verify the signature.
-                    sig.clone().verify_hash(&ka, ctx.ctx.clone())?;
-                    if legacy {
-                        return Err(Error::NotTrusted(
-                            "verification relies on legacy crypto".into()));
-                    } else {
-                        return Ok(());
-                    }
+                    return Ok(());
                 }
             }
             None => {
