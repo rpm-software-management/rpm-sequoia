@@ -1,7 +1,7 @@
 [package]
 name = "rpm-sequoia"
 description = "An implementation of the RPM PGP interface using Sequoia."
-version = "1.2.0"
+version = "1.3.0"
 authors = ["Neal H. Walfield <neal@pep.foundation>"]
 homepage = "https://sequoia-pgp.org/"
 repository = "https://github.com/rpm-software-management/rpm-sequoia"
