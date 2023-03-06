@@ -7,16 +7,28 @@ interface] using [Sequoia].
 
 # Configuration
 
-This library reads the [crypto policy configuration] in
-`/etc/crypto-policies/back-ends/sequoia.config`.  This can be
-overridden using the `SEQUOIA_CRYPTO_POLICY` environment variable.  If
-set to the empty string, then no crypto policy will be read and
-instead [Sequoia's default policy] will be used.
+This library's [crypto policy] can be customized.  It finds the
+configuration file by checking the following in turn:
+
+  - the `RPM_SEQUOIA_CRYPTO_POLICY` environment variable,
+  - `/etc/crypto-policies/back-ends/rpm-sequoia.config`,
+  - the `SEQUOIA_CRYPTO_POLICY` environment variable, and finally,
+  - `/etc/crypto-policies/back-ends/sequoia.config`.
+
+Only the first configuration file that is present is used.  If an
+environment is set to the empty string, then an empty configuration
+file is used.  That is, the default policy is used.
+
+Thus, if `RPM_SEQUOIA_CRYPTO_POLICY` is not set, and
+`/etc/crypto-policies/back-ends/rpm-sequoia.config`, the latter will
+be used.  In this case, `SEQUOIA_CRYPTO_POLICY` and
+`/etc/crypto-policies/back-ends/sequoia.config` will be completely
+ignored.
 
 Refer to the [Fedora Crypto Policy] project for information about the
 crypto policy.
 
-  [crypto policy configuration]: https://docs.rs/sequoia-policy-config/latest/sequoia_policy_config/
+  [crypto policy]: https://docs.rs/sequoia-policy-config/latest/sequoia_policy_config/
   [Sequoia's default policy]: https://docs.sequoia-pgp.org/sequoia_openpgp/policy/struct.StandardPolicy.html
   [Fedora Crypto Policy]: https://gitlab.com/redhat-crypto/fedora-crypto-policies/
 

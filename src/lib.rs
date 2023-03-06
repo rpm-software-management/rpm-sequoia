@@ -153,6 +153,13 @@ lazy_static::lazy_static! {
     };
 }
 
+// By default we prefer this environment variable and this file, but
+// if that is not present, we fallback to the default configuration.
+const RPM_SEQUOIA_CONFIG_ENV: &'static str
+    = "RPM_SEQUOIA_CRYPTO_POLICY";
+const RPM_SEQUOIA_CONFIG: &'static str
+    = "/etc/crypto-policies/back-ends/rpm-sequoia.config";
+
 ffi!(
 /// int rpmInitCrypto(void)
 fn _rpmInitCrypto() -> Binary {
@@ -169,9 +176,22 @@ fn _rpmInitCrypto() -> Binary {
 
     let mut p = sequoia_policy_config::ConfiguredStandardPolicy
         ::from_policy(p);
-    if let Err(err) = p.parse_default_config() {
-        eprintln!("Reading configuration: {}", err);
-        return Err(err.into());
+
+    match p.parse_config(RPM_SEQUOIA_CONFIG_ENV,
+                         RPM_SEQUOIA_CONFIG)
+    {
+        Ok(false) => {
+            // Fallback to the default configuration.
+            if let Err(err) = p.parse_default_config() {
+                eprintln!("Reading configuration: {}", err);
+                return Err(err.into());
+            }
+        }
+        Ok(true) => (),
+        Err(err) => {
+            eprintln!("Reading configuration: {}", err);
+            return Err(err.into());
+        }
     }
 
     *crate::P.write().unwrap() = p.build();
