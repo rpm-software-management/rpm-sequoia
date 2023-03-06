@@ -153,6 +153,12 @@ lazy_static::lazy_static! {
     };
 }
 
+/// Prints the error and causes, if any.
+pub fn print_error_chain(err: &anyhow::Error) {
+    eprintln!("           {}", err);
+    err.chain().skip(1).for_each(|cause| eprintln!("  because: {}", cause));
+}
+
 // By default we prefer this environment variable and this file, but
 // if that is not present, we fallback to the default configuration.
 const RPM_SEQUOIA_CONFIG_ENV: &'static str
@@ -183,13 +189,13 @@ fn _rpmInitCrypto() -> Binary {
         Ok(false) => {
             // Fallback to the default configuration.
             if let Err(err) = p.parse_default_config() {
-                eprintln!("Reading configuration: {}", err);
+                print_error_chain(&err);
                 return Err(err.into());
             }
         }
         Ok(true) => (),
         Err(err) => {
-            eprintln!("Reading configuration: {}", err);
+            print_error_chain(&err);
             return Err(err.into());
         }
     }
