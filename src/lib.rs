@@ -159,6 +159,28 @@ pub fn print_error_chain(err: &anyhow::Error) {
     err.chain().skip(1).for_each(|cause| eprintln!("  because: {}", cause));
 }
 
+// Sometimes the same error cascades, e.g.:
+//
+// ```
+// $ sq-wot --time 20230110T0406   --keyring sha1.pgp path B5FA089BA76FE3E17DC11660960E53286738F94C 231BC4AB9D8CAB86D1622CE02C0CE554998EECDB FABA8485B2D4D5BF1582AA963A8115E774FA9852 "<carol@example.org>"
+// [ ] FABA8485B2D4D5BF1582AA963A8115E774FA9852 <carol@example.org>: not authenticated (0%)
+//   ◯ B5FA089BA76FE3E17DC11660960E53286738F94C ("<alice@example.org>")
+//   │   No adequate certification found.
+//   │   No binding signature at time 2023-01-10T04:06:00Z
+//   │     No binding signature at time 2023-01-10T04:06:00Z
+//   │     No binding signature at time 2023-01-10T04:06:00Z
+// ...
+// ```
+//
+// Although technically correct, it's just noise.  Compress them.
+fn error_chain(err: &anyhow::Error) -> Vec<String> {
+    let mut errs = std::iter::once(err.to_string())
+        .chain(err.chain().map(|source| source.to_string()))
+        .collect::<Vec<String>>();
+    errs.dedup();
+    errs
+}
+
 // By default we prefer this environment variable and this file, but
 // if that is not present, we fallback to the default configuration.
 const RPM_SEQUOIA_CONFIG_ENV: &'static str
@@ -546,37 +568,183 @@ ffi!(
 fn _pgpVerifySignature(key: *const PgpDigParams,
                        sig: *const PgpDigParams,
                        ctx: *const digest::DigestContext) -> ErrorCode {
-    let key = check_optional_ptr!(key);
-    let sig = check_ptr!(sig);
+    match _pgpVerifySignature2(key, sig, ctx, std::ptr::null_mut()) {
+        0 => Ok(()),
+        ec => Err(Error::from(ec)),
+    }
+});
+
+ffi!(
+/// Like _pgpVerifySignature, but returns error messages and lints in
+/// `lint_str`.
+fn _pgpVerifySignature2(key: *const PgpDigParams,
+                        sig: *const PgpDigParams,
+                        ctx: *const digest::DigestContext,
+                        lint_str: *mut *mut c_char) -> ErrorCode {
+    let key: Option<&PgpDigParams> = check_optional_ptr!(key);
+    let sig: &PgpDigParams = check_ptr!(sig);
     // This function MUST NOT free or even change ctx.
     let mut ctx = check_ptr!(ctx).clone();
+    let mut lint_str: Option<&mut _> = check_optional_mut!(lint_str);
 
+    if let Some(lint_str) = lint_str.as_mut() {
+        **lint_str = std::ptr::null_mut();
+    }
+
+    let mut lints = Vec::new();
+    let r = pgp_verify_signature(key, sig, ctx, &mut lints);
+
+    // Return any lint / error messages.
+    if lints.len() > 0 {
+        let mut s: String = if let Some(key) = key {
+            format!(
+                "Verifying a signature using certificate {} ({}):",
+                key.cert()
+                    .map(|cert| cert.fingerprint().to_string())
+                    .unwrap_or_else(|| "<invalid certificate>".to_string()),
+                key.cert()
+                    .and_then(|cert| {
+                        cert.userids().next()
+                            .map(|userid| {
+                                String::from_utf8_lossy(userid.value()).into_owned()
+                            })
+                    })
+                    .unwrap_or_else(|| {
+                        "<unknown>".into()
+                    }))
+        } else {
+            format!(
+                "Verifying a signature, but no certificate was \
+                 provided:")
+        };
+
+        // Indent the lints.
+        let sep = "\n  ";
+
+        let lints_count = lints.len();
+        for (err_i, err) in lints.into_iter().enumerate() {
+            for (cause_i, cause) in error_chain(&err).into_iter().enumerate() {
+                if cause_i == 0 {
+                    s.push_str(sep);
+                    if lints_count > 1 {
+                        s.push_str(&format!("{}. ", err_i + 1));
+                    }
+                } else {
+                    s.push_str(sep);
+                    s.push_str("    because: ");
+                }
+                s.push_str(&cause);
+            }
+        }
+
+        t!("Lints: {}", s);
+
+        if let Some(lint_str) = lint_str.as_mut() {
+            // Add a trailing NUL.
+            s.push('\0');
+
+            **lint_str = s.as_mut_ptr() as *mut c_char;
+            // Pass ownership to the caller.
+            std::mem::forget(s);
+        }
+    }
+
+    r
+});
+
+// Verifies the signature.
+//
+// Lints are appended to `lints`.  Note: multiple lints may be added.
+fn pgp_verify_signature(key: Option<&PgpDigParams>,
+                        sig: &PgpDigParams,
+                        mut ctx: digest::DigestContext,
+                        lints: &mut Vec<anyhow::Error>)
+    -> Result<()>
+{
+    tracer!(*crate::TRACE, "pgp_verify_signature");
+
+    // Whether the verification relies on legacy cryptography.
     let mut legacy = false;
 
     let sig = sig.signature().ok_or_else(|| {
-        Error::Fail("sig is not a signature".into())
+        Error::Fail("sig parameter does not designate a signature".into())
     })?;
+
+    let sig_id = || {
+        let digest_prefix = sig.digest_prefix();
+        format!("{:02x}{:02x} created at {}",
+                digest_prefix[0],
+                digest_prefix[1],
+                if let Some(t) = sig.signature_creation_time() {
+                    DateTime::<Utc>::from(t)
+                        .format("%c").to_string()
+                } else {
+                    "<unknown>".to_string()
+                })
+    };
+
+    // A helper macro to add a lint.
+    //
+    // If `$err` is `None`, `$msg` is turned into an `anyhow::Error` and
+    // appended to `lints`.
+    //
+    // If `$err` is `Some`, `$msg` is added as context to `$err` and is
+    // then appended to `lints`.
+    macro_rules! add_lint {
+        ($err:expr, $msg:expr $(, $args:expr)*) => {{
+            let err: Option<anyhow::Error> = $err;
+            let msg = format!("{}", format_args!($msg $(, $args)*));
+            let err = if let Some(err) = err {
+                err.context(msg)
+            } else {
+                anyhow::anyhow!(msg)
+            };
+            lints.push(err);
+        }};
+    }
+
+    // A helper to return an error.
+    //
+    // This adds a lint using `lint!` and then returns
+    // `Error::Fail($msg)`.
+    macro_rules! return_err {
+        ($err:expr, $msg:expr $(, $args:expr)*) => {{
+            add_lint!($err, $msg $(, $args)*);
+            return Err(Error::Fail(
+                format!("{}", format_args!($msg $(, $args)*))));
+        }};
+    }
 
     let sig_time = if let Some(t) = sig.signature_creation_time() {
         t
     } else {
-        return Err(Error::Fail("signature invalid: no creation time".into()));
+        return_err!(
+            None,
+            "Signature {} invalid: signature missing a creation time",
+            sig_id());
     };
 
     // Allow some clock skew.
     if let Err(err) = sig.signature_alive(None,  Duration::new(5 * 60, 0)) {
-        return Err(Error::Fail(format!("signature invalid: {}", err)));
+        return_err!(
+            Some(err),
+            "Signature {} invalid: signature is not alive",
+            sig_id());
     }
 
     {
         let policy = P.read().unwrap();
         if let Err(err) = policy.signature(sig, Default::default()) {
             if NP.signature(sig, Default::default()).is_ok() {
-                t!("signature uses legacy cryptography: {}", err);
                 legacy = true;
+                add_lint!(
+                    Some(err),
+                    "Signature {} invalid: signature relies on legacy cryptography",
+                    sig_id());
             } else {
-                return Err(Error::Fail(
-                    format!("signature invalid: policy violation: {}", err)));
+                return_err!(
+                    Some(err),
+                    "Signature {} invalid: policy violation", sig_id());
             }
         }
         // XXX: As of sequoia-openpgp v1.11.0, this check is not done
@@ -585,11 +753,15 @@ fn _pgpVerifySignature(key: *const PgpDigParams,
         // sequoia-openpgp that does this, remove this code.
         if let Err(err) = policy.packet(&Packet::from(sig.clone())) {
             if NP.packet(&Packet::from(sig.clone())).is_ok() {
-                t!("signature uses legacy cryptography: {}", err);
                 legacy = true;
+                add_lint!(
+                    Some(err),
+                    "Signature {} invalid: signature relies on legacy cryptography",
+                    sig_id());
             } else {
-                return Err(Error::Fail(
-                    format!("signature invalid: policy violation: {}", err)));
+                return_err!(
+                    Some(err),
+                    "Signature {} invalid: policy violation", sig_id());
             }
         }
     }
@@ -598,83 +770,92 @@ fn _pgpVerifySignature(key: *const PgpDigParams,
     // subpacket.
     let issuer = match sig.get_issuers().into_iter().next() {
         Some(issuer) => issuer,
-        None => return Err(Error::Fail("No issuer".into())),
+        None => return_err!(
+            None,
+            "Signature {} invalid: signature has no issuer subpacket",
+            sig_id()),
     };
 
     if let Some(key) = key {
         // Actually verify the signature.
         let cert = key.cert().ok_or_else(|| {
-            Error::Fail("key is not a cert".into())
+            Error::Fail("key parameter is not a cert".into())
         })?;
         let subkey = key.key().expect("is a certificate").fingerprint();
+
+        t!("Checking signature {} using {} with {} / {}",
+           sig_id(), sig.hash_algo(),
+           cert.fingerprint(), subkey);
 
         // We evaluate the certificate as of the signature creation
         // time.
         let p = &*P.read().unwrap();
         let vc = cert.with_policy(p, sig_time)
             .or_else(|err| {
-                t!("certificate {} ({}) uses legacy cryptography: {}",
-                   cert.keyid(),
-                   cert.userids().next()
-                       .map(|userid| {
-                           String::from_utf8_lossy(userid.value()).into_owned()
-                       })
-                       .unwrap_or_else(|| {
-                           "<unknown>".into()
-                       }),
-                   err);
                 legacy = true;
+                add_lint!(
+                    Some(err),
+                    "Certificate {} invalid: policy violation",
+                    cert.keyid());
                 cert.with_policy(NP, sig_time)
-                    // Prefer the original error.
-                    .map_err(|_np_err| err)
             })?;
 
         if let Err(err) = vc.alive() {
             legacy = true;
-            t!("{} is invalid: not alive: {}",
-               vc.fingerprint(), err);
+            add_lint!(
+                Some(err),
+                "Certificiate {} invalid: certificate is not alive",
+                vc.keyid());
         }
         if let RevocationStatus::Revoked(_) = vc.revocation_status() {
             legacy = true;
-            t!("{} is invalid: certificate is revoked",
-               vc.fingerprint());
+            add_lint!(
+                None,
+                "Certificate {} invalid: certificate is revoked",
+                vc.keyid());
         }
 
         // Find the key.
         match vc.keys().key_handle(issuer.clone()).next() {
             Some(ka) => {
                 if ka.fingerprint() != subkey {
-                    return Err(Error::Fail(
-                        format!("key invalid: wrong subkey")));
+                    return_err!(None,
+                                "Key {} invalid: wrong subkey ({})",
+                                ka.keyid(), subkey);
                 }
                 if ! ka.for_signing() {
-                    return Err(Error::Fail(
-                        format!("key invalid: key is not signing capable")));
+                    return_err!(None,
+                                "Key {} invalid: not signing capable",
+                                ka.keyid());
                 }
                 if let Err(err) = ka.alive() {
                     legacy = true;
-                    t!("{} is invalid: key is not alive: {}",
-                       vc.fingerprint(), err);
+                    add_lint!(Some(err),
+                              "Key {} invalid: key is not alive",
+                              ka.keyid());
                 }
                 if let RevocationStatus::Revoked(_) = ka.revocation_status() {
                     legacy = true;
-                    t!("{} is invalid: key is revoked",
-                       vc.fingerprint());
+                    add_lint!(None,
+                              "Key {} is invalid: key is revoked",
+                              ka.keyid());
                 }
 
                 // Finally we can verify the signature.
                 sig.clone().verify_hash(&ka, ctx.ctx.clone())?;
                 if legacy {
                     return Err(Error::NotTrusted(
-                        "verification relies on legacy crypto".into()));
+                        "Verification relies on legacy crypto".into())
+                               .into());
                 } else {
                     return Ok(());
                 }
             }
             None => {
-                return Err(Error::Fail(
-                    format!("Cert does not contain key {} or it is not valid",
-                            issuer)));
+                return_err!(None,
+                            "Certificate {} does not contain key {} \
+                             or it is not valid",
+                            vc.keyid(), issuer);
             }
         }
     } else {
@@ -749,7 +930,7 @@ fn _pgpVerifySignature(key: *const PgpDigParams,
         return Err(Error::NoKey(
             format!("Not provided (issuer: {})", issuer).into()));
     }
-});
+}
 
 ffi!(
 /// Returns the Key ID of the public key or the secret key stored in

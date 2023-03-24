@@ -24,6 +24,7 @@ _pgpDigParamsVersion
 _pgpDigParamsCreationTime
 _pgpDigParamsFree
 _pgpVerifySignature
+_pgpVerifySignature2
 _pgpVerifySig
 _pgpSignatureType
 # Implemented by rpmpgp.c.
