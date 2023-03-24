@@ -92,10 +92,16 @@ fn main() -> Result<(), anyhow::Error> {
         Some(None) => Err(anyhow::anyhow!("PREFIX contains invalid UTF-8"))?,
         None => "/usr/local",
     };
+    let libdir = env::var_os("LIBDIR");
+    let libdir: &str = match libdir.as_ref().map(|s| s.to_str()) {
+        Some(Some(s)) => s,
+        Some(None) => Err(anyhow::anyhow!("LIBDIR contains invalid UTF-8"))?,
+        None => "${prefix}/lib",
+    };
 
     let content = pc_in.substitute(HashMap::from([
         ("PREFIX".to_string(), prefix.into()),
-        ("LIBDIR".to_string(), "${prefix}/lib".into()),
+        ("LIBDIR".to_string(), libdir.into()),
     ]))?;
 
     let mut pc = File::create(&pc).expect(
@@ -126,6 +132,7 @@ fn main() -> Result<(), anyhow::Error> {
     println!("cargo:rerun-if-changed=Cargo.toml");
     println!("cargo:rerun-if-changed=rpm-sequoia.pc.in");
     println!("cargo:rerun-if-env-changed=PREFIX");
+    println!("cargo:rerun-if-env-changed=LIBDIR");
     println!("cargo:rerun-if-env-changed=PROFILE");
     println!("cargo:rerun-if-env-changed=CARGO_TARGET_DIR");
 
@@ -140,10 +147,14 @@ fn main() -> Result<(), anyhow::Error> {
     let minor = env::var("CARGO_PKG_VERSION_MINOR").unwrap();
     let patch = env::var("CARGO_PKG_VERSION_PATCH").unwrap();
 
+    // libdir might contain "${prefix}". Replace it with
+    // the actual prefix value if found.
+    let libdir_resolved = libdir.replace("${prefix}", prefix);
+
     let linker_lines = cdylib_link_lines::shared_object_link_args(
         "rpm_sequoia",
         &major, &minor, &patch, &arch, &os, &env,
-        PathBuf::from(prefix).join("lib"), build_dir.clone(),
+        PathBuf::from(libdir_resolved), build_dir.clone(),
     );
 
     for line in linker_lines {

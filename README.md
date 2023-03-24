@@ -51,7 +51,8 @@ $ git clone git@github.com:rpm-software-management/rpm-sequoia.git
 Cloning into 'rpm-sequoia'...
 done.
 $ cd rpm-sequoia
-$ PREFIX=/usr cargo build --release && cargo test --release
+$ PREFIX=/usr LIBDIR="\${prefix}/lib64" \
+  cargo build --release && cargo test --release
     Updating crates.io index
 ...
 test result: ok. ...
@@ -96,10 +97,16 @@ cryptographic backends.
 
 The rpm-sequoia artifacts (the .a, .so, and the .pc files) are placed
 in the build directory, which, in this case, is
-`/tmp/rpm/rpm-sequoia/target/release`.  We also set the `PREFIX`
-environment variable when calling `cargo build`.  This is the prefix
-that will be used in the generated `rpm-sequoia.pc` file.  It defaults
-to `/usr/local`.
+`/tmp/rpm/rpm-sequoia/target/release`.
+
+We also set two environment variables when calling `cargo build`:
+
+* `PREFIX` is the prefix that will be used in the generated
+  `rpm-sequoia.pc` file. It defaults to `/usr/local`.
+
+* `LIBDIR` is the installed library path listed in the generated
+  metadata. It can be an absolute path or one based on `${prefix}`,
+  and defaults to `${prefix}/lib`.
 
 
 To run just one or two tests, do something like the following:
