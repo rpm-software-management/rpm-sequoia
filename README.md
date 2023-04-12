@@ -63,13 +63,14 @@ done.
 $ cd rpm
 $ git checkout rpm-4.18.1-release
 Switched to a new branch 'rpm-4.18.1-release'
+$ sudo dnf install automake autoconf gettext-devel libtool tar zlib-devel file-devel libarchive-devel popt-devel sqlite-devel lua-devel fakechroot
 $ autoreconf -fis
 ...
 $ mkdir b
 $ cd b
 $ export PKG_CONFIG_PATH=/tmp/rpm/rpm-sequoia/target/release
 $ export LD_LIBRARY_PATH=/tmp/rpm/rpm-sequoia/target/release
-$ ../configure --with-crypto=sequoia
+$ ../configure --prefix=/ --with-crypto=sequoia
 $ make
 $ make check
 ```
