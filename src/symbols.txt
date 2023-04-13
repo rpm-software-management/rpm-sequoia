@@ -4,6 +4,7 @@
 _pgpPubkeyFingerprint
 _pgpPubkeyKeyID
 _pgpPrtParams
+_pgpPrtParams2
 _pgpPrtParamsSubkeys
 _pgpPrtPkts
 # Implemented by rpmpgp.c.

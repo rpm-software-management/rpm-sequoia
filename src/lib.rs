@@ -181,6 +181,47 @@ fn error_chain(err: &anyhow::Error) -> Vec<String> {
     errs
 }
 
+// Generate macros for working with lints.
+//
+// Note: $dollar is a hack, which we use because nested macros with
+// repetitions don't currently work.  See:
+// https://github.com/rust-lang/rust/pull/95860
+macro_rules! linter {
+    ($dollar:tt, $lints:ident) => {
+        // A helper macro to add a lint.
+        //
+        // If `$err` is `None`, `$msg` is turned into an `anyhow::Error` and
+        // appended to `lints`.
+        //
+        // If `$err` is `Some`, `$msg` is added as context to `$err` and is
+        // then appended to `lints`.
+        macro_rules! add_lint {
+            ($err:expr, $msg:expr $dollar(, $args:expr)*) => {{
+                let err: Option<anyhow::Error> = $err;
+                let msg = format!("{}", format_args!($msg $dollar(, $args)*));
+                let err = if let Some(err) = err {
+                    err.context(msg)
+                } else {
+                    anyhow::anyhow!(msg)
+                };
+                $lints.push(err);
+            }};
+        }
+
+        // A helper to return an error.
+        //
+        // This adds a lint using `lint!` and then returns
+        // `Error::Fail($msg)`.
+        macro_rules! return_err {
+            ($err:expr, $msg:expr $dollar(, $args:expr)*) => {{
+                add_lint!($err, $msg $dollar(, $args)*);
+                return Err(Error::Fail(
+                    format!("{}", format_args!($msg $dollar(, $args)*))));
+            }};
+        }
+    }
+}
+
 // By default we prefer this environment variable and this file, but
 // if that is not present, we fallback to the default configuration.
 const RPM_SEQUOIA_CONFIG_ENV: &'static str
@@ -663,6 +704,8 @@ fn pgp_verify_signature(key: Option<&PgpDigParams>,
 {
     tracer!(*crate::TRACE, "pgp_verify_signature");
 
+    linter!($, lints);
+
     // Whether the verification relies on legacy cryptography.
     let mut legacy = false;
 
@@ -682,38 +725,6 @@ fn pgp_verify_signature(key: Option<&PgpDigParams>,
                     "<unknown>".to_string()
                 })
     };
-
-    // A helper macro to add a lint.
-    //
-    // If `$err` is `None`, `$msg` is turned into an `anyhow::Error` and
-    // appended to `lints`.
-    //
-    // If `$err` is `Some`, `$msg` is added as context to `$err` and is
-    // then appended to `lints`.
-    macro_rules! add_lint {
-        ($err:expr, $msg:expr $(, $args:expr)*) => {{
-            let err: Option<anyhow::Error> = $err;
-            let msg = format!("{}", format_args!($msg $(, $args)*));
-            let err = if let Some(err) = err {
-                err.context(msg)
-            } else {
-                anyhow::anyhow!(msg)
-            };
-            lints.push(err);
-        }};
-    }
-
-    // A helper to return an error.
-    //
-    // This adds a lint using `lint!` and then returns
-    // `Error::Fail($msg)`.
-    macro_rules! return_err {
-        ($err:expr, $msg:expr $(, $args:expr)*) => {{
-            add_lint!($err, $msg $(, $args)*);
-            return Err(Error::Fail(
-                format!("{}", format_args!($msg $(, $args)*))));
-        }};
-    }
 
     let sig_time = if let Some(t) = sig.signature_creation_time() {
         t
@@ -1256,6 +1267,76 @@ fn _pgpPrtParams(pkts: *const u8, pktlen: size_t,
                  pkttype: c_uint, paramsp: *mut *mut PgpDigParams)
     -> Binary
 {
+    match _pgpPrtParams2(pkts, pktlen, pkttype, paramsp, std::ptr::null_mut()) {
+        0 => Ok(()),
+        ec => Err(Error::from(ec)),
+    }
+});
+
+ffi!(
+/// Like _pgpPrtParams, but returns error messages and lints in
+/// `lint_str`.
+fn _pgpPrtParams2(pkts: *const u8, pktlen: size_t,
+                  pkttype: c_uint, paramsp: *mut *mut PgpDigParams,
+                  lint_str: *mut *mut c_char)
+    -> Binary
+{
+    let mut lint_str: Option<&mut _> = check_optional_mut!(lint_str);
+
+    if let Some(lint_str) = lint_str.as_mut() {
+        **lint_str = std::ptr::null_mut();
+    }
+
+    let mut lints = Vec::new();
+    let r = pgp_prt_params(pkts, pktlen, pkttype, paramsp, &mut lints);
+
+    // Return any lint / error messages.
+    if lints.len() > 0 {
+        let mut s: String = format!("Parsing an OpenPGP packet:");
+
+        // Indent the lints.
+        let sep = "\n  ";
+
+        let lints_count = lints.len();
+        for (err_i, err) in lints.into_iter().enumerate() {
+            for (cause_i, cause) in error_chain(&err).into_iter().enumerate() {
+                if cause_i == 0 {
+                    s.push_str(sep);
+                    if lints_count > 1 {
+                        s.push_str(&format!("{}. ", err_i + 1));
+                    }
+                } else {
+                    s.push_str(sep);
+                    s.push_str("    because: ");
+                }
+                s.push_str(&cause);
+            }
+        }
+
+        t!("Lints: {}", s);
+
+        if let Some(lint_str) = lint_str.as_mut() {
+            // Add a trailing NUL.
+            s.push('\0');
+
+            **lint_str = s.as_mut_ptr() as *mut c_char;
+            // Pass ownership to the caller.
+            std::mem::forget(s);
+        }
+    }
+
+    r
+});
+
+fn pgp_prt_params(pkts: *const u8, pktlen: size_t,
+                  pkttype: c_uint, paramsp: *mut *mut PgpDigParams,
+                  lints: &mut Vec<anyhow::Error>)
+    -> Result<()>
+{
+    tracer!(*crate::TRACE, "pgp_prt_params");
+
+    linter!($, lints);
+
     let pkttype: Option<Tag> = if pkttype == 0 {
         None
     } else {
@@ -1277,9 +1358,10 @@ fn _pgpPrtParams(pkts: *const u8, pktlen: size_t,
                 let (packet, next_ppr) = pp.next()?;
 
                 if let PacketParserResult::Some(p) = next_ppr {
-                    return Err(Error::Fail(
-                        format!("Expected a bare signature, got a trailing {}",
-                                p.packet.tag())));
+                    return_err!(None,
+                                "Expected a bare OpenPGP signature, \
+                                 but it's followed by a {}",
+                                p.packet.tag());
                 }
 
                 let sig = if let Packet::Signature(sig) = packet {
@@ -1302,9 +1384,16 @@ fn _pgpPrtParams(pkts: *const u8, pktlen: size_t,
                     || pkttype == Some(Tag::PublicKey)
                     || pkttype == Some(Tag::SecretKey) =>
             {
-                let cert = CertParser::from(PacketParserResult::Some(pp))
-                    .next()
-                    .ok_or(Error::Fail("Not an OpenPGP message".into()))??;
+                let cert = match CertParser::from(PacketParserResult::Some(pp)).next()
+                {
+                    Some(Ok(cert)) => cert,
+                    Some(Err(err)) => return_err!(
+                        Some(err),
+                        "Failed to read an OpenPGP certificate"),
+                    None => return_err!(
+                        None,
+                        "Failed to read an OpenPGP certificate"),
+                };
 
                 let keyid = cert.keyid().as_bytes().to_vec();
 
@@ -1324,12 +1413,30 @@ fn _pgpPrtParams(pkts: *const u8, pktlen: size_t,
                  Some(keyid),
                  userid)
             }
+            Packet::Unknown(mut u) => {
+                let mut err = u.set_error(anyhow::anyhow!("Error"));
+                if let Some(openpgp::Error::MalformedMPI(_))
+                    = err.downcast_ref::<openpgp::Error>()
+                {
+                    err = err.context("\
+                        Signature appears to be created by a \
+                        non-conformant OpenPGP implementation, see \
+                        <https://github.com/rpm-software-management/rpm/issues/2351>.");
+                }
+
+                return_err!(Some(err), "Failed to parse {}", u.tag());
+            }
             ref p => {
-                return Err(Error::Fail(format!("{}", p.tag())));
+                return_err!(
+                    None,
+                    "Unexpected OpenPGP packet in this context {}",
+                    p.tag());
             }
         }
     } else {
-        return Err(Error::Fail("Not an OpenPGP message".into()));
+        return_err!(
+            None,
+            "Expected an OpenPGP packet, encountered the end of the file");
     };
 
     let mut buffer: [u8; 8] = [0; 8];
@@ -1354,7 +1461,7 @@ fn _pgpPrtParams(pkts: *const u8, pktlen: size_t,
     });
 
     Ok(())
-});
+}
 
 ffi!(
 /// Returns a `PgpDigParams` data structure for each subkey.
