@@ -29,6 +29,22 @@ impl PkgConfigTemplate {
             ("DESCRIPTION".to_string(), env!("CARGO_PKG_DESCRIPTION").to_string()),
             ("VERSION".to_string(), env!("CARGO_PKG_VERSION").to_string()),
             ("HOMEPAGE".to_string(), env!("CARGO_PKG_HOMEPAGE").to_string()),
+            ("REQUIRES".to_string(),
+             if cfg!(feature = "crypto-botan") {
+                 "botan-2"
+             } else if cfg!(feature = "crypto-nettle") {
+                 "nettle"
+             } else if cfg!(feature = "crypto-openssl") {
+                 "libssl"
+             } else if cfg!(feature = "crypto-cng") {
+                 ""
+             } else if cfg!(feature = "crypto-rust") {
+                 ""
+             } else {
+                 panic!("No cryptographic backend selected.  Try: \
+                         \"cargo build --no-default-features \
+                         --features crypto-openssl\"")
+             }.to_string()),
         ]);
 
         Ok(PkgConfigTemplate {

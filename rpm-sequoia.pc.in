@@ -5,6 +5,6 @@ Name: @NAME@
 Description: @DESCRIPTION@
 URL: @HOMEPAGE@
 Version: @VERSION@
-Requires.private: nettle
+Requires.private: @REQUIRES@
 Cflags:
 Libs: -L${libdir} -lrpm_sequoia
