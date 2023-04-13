@@ -88,7 +88,7 @@ use Sequoia's OpenSSL backend, you would compile `rpm-sequoia` as
 follows:
 
 ```
-$ cargo build --release --no-default-features --features sequoia-openpgp/crypto-openssl
+$ cargo build --release --no-default-features --features crypto-openssl
 ```
 
 See [`sequoia-openpgp`'s README] for the list of currently supported
