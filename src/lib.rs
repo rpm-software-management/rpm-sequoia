@@ -809,6 +809,30 @@ fn pgp_verify_signature(key: Option<&PgpDigParams>,
                     "Certificate {} invalid: policy violation",
                     cert.keyid());
                 cert.with_policy(NP, sig_time)
+            })
+            .or_else(|err| {
+                // Try again, but use the current time as a reference
+                // time.  This is necessary if older self-signatures
+                // are stripped.
+                legacy = true;
+                match cert.with_policy(p, None) {
+                    Ok(vc) => {
+                        add_lint!(
+                            None,
+                            "Certificate has no valid binding signature \
+                             as of the signature's creation time, but \
+                             is valid now.  The certificate has probably \
+                             been stripped or minimized.");
+                        Ok(vc)
+                    }
+                    Err(err2) => {
+                        add_lint!(
+                            Some(err),
+                            "Certificate {} invalid: policy violation",
+                            cert.keyid());
+                        Err(err2)
+                    }
+                }
             })?;
 
         if let Err(err) = vc.alive() {
