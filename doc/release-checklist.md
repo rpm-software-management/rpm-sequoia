@@ -22,11 +22,11 @@ This is a checklist for doing releases.
      - `git clone git@github.com:rpm-software-management/rpm-sequoia.git`
      - `cd rpm-sequoia`
      - `git checkout origin/staging`
-     - `cargo publish --features sequoia-openpgp/crypto-nettle --dry-run`
+     - `cargo publish --features crypto-nettle --dry-run`
   1. Wait until CI and `cargo publish ... --dry-run` are
      successful. In case of errors, correct them, and restart.
   1. Merge the merge request.
-  1. Run `cargo publish --features sequoia-openpgp/crypto-nettle`.
+  1. Run `cargo publish --features crypto-nettle`.
   1. Make a tag `vXXX` with the message `Release XXX.` signed with an
      offline-key, which has been certified by our
      `openpgp-ca@sequoia-pgp.org` key.
