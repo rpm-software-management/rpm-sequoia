@@ -10,7 +10,7 @@ jobs:
     name: Codespell
     runs-on: ubuntu-22.04
     steps:
-      - name: Setup | Checkout
+      - name: Setup | Checkout rpm-sequoia
         uses: actions/checkout@v2
       - name: Setup | Dependencies
         run: sudo apt update && sudo apt install codespell
@@ -21,12 +21,12 @@ jobs:
     name: Compile
     runs-on: ubuntu-latest
     steps:
-      - name: Setup | Checkout
+      - name: Setup | Checkout rpm-sequoia
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
 
-      - name: Setup | Build Cache
+      - name: Setup | Build Cache rpm-sequoia
         uses: actions/cache@v3
         with:
           path: |
@@ -37,17 +37,147 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Setup | Dependencies
+      - name: Setup | Dependencies rpm-sequoia
         run: sudo apt update && sudo apt install cargo clang git nettle-dev pkg-config libssl-dev
 
-      - name: Build | Compile
+      - name: Build | Compile rpm-sequoia
         run: cargo build
 
-      - name: Build | Test
+      - name: Build | Test rpm-sequoia
         run: cargo test
 
-      - name: Build | Doc
+      - name: Build | Doc rpm-sequoia
         run: cargo doc --no-deps
+
+  all_commits:
+    name: All Commits
+    runs-on: ubuntu-latest
+    needs: ["Compile"]
+    steps:
+      - name: Setup | Checkout rpm-sequoia
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Setup | Build Cache rpm-sequoia
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Setup | Dependencies rpm-sequoia
+        run: sudo apt update && sudo apt install cargo clang git nettle-dev pkg-config libssl-dev
+
+      - name: Build | Compile rpm-sequoia
+        run: cargo build
 
       - name: Build | Test other commits
         run: .ci/all_commits.sh
+
+  rpm:
+    name: RPM
+    runs-on: ubuntu-latest
+    needs: ["Compile"]
+    steps:
+      - name: Setup | Checkout rpm-sequoia
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Setup | Build Cache rpm-sequoia
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Setup | Dependencies rpm-sequoia
+        run: sudo apt update && sudo apt install cargo clang git nettle-dev pkg-config libssl-dev
+
+      - name: Build | Compile rpm-sequoia
+        run: cargo build
+
+      - name: Setup | rpm Dependencies
+        run: sudo apt install automake autoconf autopoint gettext libtool tar zlib1g-dev libpopt-dev libsqlite0-dev liblua5.4-dev fakechroot libarchive-dev
+
+      - name: Setup | Checkout rpm
+        uses: actions/checkout@v2
+        with:
+          repository: rpm-software-management/rpm.git
+          ref: rpm-4.18.x
+          fetch-depth: 1
+          path: rpm-pristine
+
+      - name: Setup | Build Cache rpm
+        uses: actions/cache@v3
+        with:
+          path: |
+            rpm/
+            rpm-build/
+          key: ${{ runner.os }}-rpm-${{ hashFiles('rpm-pristine/.git/HEAD', 'rpm-pristine/.git/refs/heads/master') }}
+
+      - name: Test | rpm
+        run: |
+             export PKG_CONFIG_PATH=$(pwd)/target/debug
+             if ! test -e $PKG_CONFIG_PATH/rpm-sequoia-uninstalled.pc
+             then
+                 echo "$PKG_CONFIG_PATH/rpm-sequoia-uninstalled.pc is missing.  Did you build librpm-sequoia?"
+                 exit 1
+             fi
+
+             export LD_LIBRARY_PATH=$PKG_CONFIG_PATH
+             if ! test -e $LD_LIBRARY_PATH/librpm_sequoia.so
+             then
+                 echo "$LD_LIBRARY_PATH/librpm_sequoia.so is missing.  Did you build librpm-sequoia?"
+                 exit 1
+             fi
+
+             echo "::group::configure"
+
+             # If rpm doesn't exist, then we don't have a cache of an
+             # rpm build.
+             if ! test -e rpm
+             then
+                 cp -a rpm-pristine rpm
+
+                 cd rpm
+                 autoreconf -is
+                 cd ..
+
+                 mkdir -p rpm-build
+                 cd rpm-build
+                 ../rpm/configure --prefix=/ --with-crypto=sequoia
+             else
+                 cd rpm-build
+             fi
+             echo "::endgroup::"
+
+             echo "::group::make"
+             make
+             echo "::endgroup::"
+
+             echo "::group::make check"
+             cd tests
+             if ! make check TESTSUITEFLAGS="-k OpenPGP -k signature -k rpmkeys -k digest"
+             then
+                 echo "::endgroup::"
+
+                 for log in rpmtests.dir/*/rpmtests.log
+                 do
+                     echo "::group::$log"
+                     cat $log || true
+                     echo "::endgroup::"
+                 done
+                 exit 1
+             else
+                 echo "::endgroup::"
+             fi
