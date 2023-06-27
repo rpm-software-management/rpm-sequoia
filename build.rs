@@ -31,6 +31,8 @@ impl PkgConfigTemplate {
             ("HOMEPAGE".to_string(), env!("CARGO_PKG_HOMEPAGE").to_string()),
             ("REQUIRES".to_string(),
              if cfg!(feature = "crypto-botan") {
+                 "botan-3"
+             } else if cfg!(feature = "crypto-botan2") {
                  "botan-2"
              } else if cfg!(feature = "crypto-nettle") {
                  "nettle"

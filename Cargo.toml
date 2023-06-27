@@ -49,4 +49,5 @@ crypto-rust = ["sequoia-openpgp/crypto-rust"]
 crypto-cng = ["sequoia-openpgp/crypto-cng"]
 crypto-openssl = ["sequoia-openpgp/crypto-openssl"]
 crypto-botan = ["sequoia-openpgp/crypto-botan"]
+crypto-botan2 = ["sequoia-openpgp/crypto-botan2"]
 
