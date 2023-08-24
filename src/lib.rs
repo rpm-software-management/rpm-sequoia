@@ -803,18 +803,9 @@ fn pgp_verify_signature(key: Option<&PgpDigParams>,
         let p = &*P.read().unwrap();
         let vc = cert.with_policy(p, sig_time)
             .or_else(|err| {
-                legacy = true;
-                add_lint!(
-                    Some(err),
-                    "Certificate {} invalid: policy violation",
-                    cert.keyid());
-                cert.with_policy(NP, sig_time)
-            })
-            .or_else(|err| {
                 // Try again, but use the current time as a reference
-                // time.  This is necessary if older self-signatures
-                // are stripped.
-                legacy = true;
+                // time.  It is quite comment for old self-signatures
+                // to be stripped.
                 match cert.with_policy(p, None) {
                     Ok(vc) => {
                         add_lint!(
@@ -833,6 +824,14 @@ fn pgp_verify_signature(key: Option<&PgpDigParams>,
                         Err(err2)
                     }
                 }
+            })
+            .or_else(|err| {
+                legacy = true;
+                add_lint!(
+                    Some(err),
+                    "Certificate {} invalid: policy violation",
+                    cert.keyid());
+                cert.with_policy(NP, sig_time)
             })?;
 
         if let Err(err) = vc.alive() {
