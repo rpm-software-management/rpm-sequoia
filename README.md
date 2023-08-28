@@ -45,6 +45,7 @@ by default.
 Here's how to build rpm-sequoia and a version of rpm that uses it:
 
 ```
+$ sudo dnf install cargo rustc clang pkg-config nettle-devel
 $ mkdir /tmp/rpm
 $ cd /tmp/rpm
 $ git clone git@github.com:rpm-software-management/rpm-sequoia.git
