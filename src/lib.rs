@@ -804,16 +804,22 @@ fn pgp_verify_signature(key: Option<&PgpDigParams>,
         let vc = cert.with_policy(p, sig_time)
             .or_else(|err| {
                 // Try again, but use the current time as a reference
-                // time.  It is quite comment for old self-signatures
+                // time.  It is quite common for old self-signatures
                 // to be stripped.
                 match cert.with_policy(p, None) {
                     Ok(vc) => {
-                        add_lint!(
-                            None,
-                            "Certificate has no valid binding signature \
-                             as of the signature's creation time, but \
-                             is valid now.  The certificate has probably \
-                             been stripped or minimized.");
+                        // We'd really like to emit the following
+                        // lint, but for most users it is not
+                        // actionable.  When the ecosystem changes so
+                        // that certificates include older self
+                        // signatures, enable it again.
+
+                        // add_lint!(
+                        //     None,
+                        //     "Certificate has no valid binding signature \
+                        //      as of the signature's creation time, but \
+                        //      is valid now.  The certificate has probably \
+                        //      been stripped or minimized.");
                         Ok(vc)
                     }
                     Err(err2) => {
