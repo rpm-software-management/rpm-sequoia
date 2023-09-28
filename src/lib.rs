@@ -713,6 +713,12 @@ fn pgp_verify_signature(key: Option<&PgpDigParams>,
         Error::Fail("sig parameter does not designate a signature".into())
     })?;
 
+    {
+        use openpgp::serialize::SerializeInto;
+        let data = Packet::from(sig.clone()).to_vec().expect("can serialize");
+        std::fs::write("/tmp/rpm.sig", data).expect("can write to /tmp/rpm.sig");
+    }
+
     let sig_id = || {
         let digest_prefix = sig.digest_prefix();
         format!("{:02x}{:02x} created at {}",
