@@ -1672,7 +1672,6 @@ fn _pgpPubKeyLint(pkts: *const c_char,
                                   unspecified reason");
                         }
                     }
-                    break 'done false;
                 }
 
                 if let Err(err) = vc.alive() {
@@ -1685,7 +1684,6 @@ fn _pgpPubKeyLint(pkts: *const c_char,
                                           err));
                         }
                     }
-                    break 'done false;
                 }
             }
         };
