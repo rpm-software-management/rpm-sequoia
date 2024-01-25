@@ -93,6 +93,7 @@ use libc::{
 use chrono::{
     DateTime,
     NaiveDateTime,
+    TimeZone,
     Utc,
 };
 
@@ -1983,7 +1984,7 @@ fn dump_packets(pkts: &[u8]) -> Result<()> {
                         // This is just compatibility, debugging
                         // output.  Fallback to the unix epoch.
                         .unwrap_or_default();
-                    let t = DateTime::<Utc>::from_utc(t, Utc);
+                    let t = Utc::from_utc_datetime(&Utc, &t);
                     output.push(format!("  {}(0x{:08x})",
                                         t.format("%c"),
                                         d.as_secs()));
