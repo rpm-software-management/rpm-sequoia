@@ -2,7 +2,7 @@
 name = "rpm-sequoia"
 description = "An implementation of the RPM PGP interface using Sequoia."
 version = "1.5.0"
-authors = ["Neal H. Walfield <neal@pep.foundation>"]
+authors = ["Neal H. Walfield <neal@sequoia-pgp.org>"]
 homepage = "https://sequoia-pgp.org/"
 repository = "https://github.com/rpm-software-management/rpm-sequoia"
 readme = "README.md"
