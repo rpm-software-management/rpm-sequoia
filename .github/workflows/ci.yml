@@ -107,13 +107,13 @@ jobs:
         run: cargo build
 
       - name: Setup | rpm Dependencies
-        run: sudo apt install automake autoconf autopoint gettext libtool tar zlib1g-dev libpopt-dev libsqlite0-dev liblua5.4-dev fakechroot libarchive-dev
+        run: sudo apt install cmake autoconf gettext tar zlib1g-dev libpopt-dev libsqlite0-dev liblua5.4-dev libarchive-dev
 
       - name: Setup | Checkout rpm
         uses: actions/checkout@v2
         with:
           repository: rpm-software-management/rpm.git
-          ref: rpm-4.18.x
+          ref: rpm-4.19.x
           fetch-depth: 1
           path: rpm-pristine
 
@@ -149,13 +149,9 @@ jobs:
              then
                  cp -a rpm-pristine rpm
 
-                 cd rpm
-                 autoreconf -is
-                 cd ..
-
                  mkdir -p rpm-build
                  cd rpm-build
-                 ../rpm/configure --prefix=/ --with-crypto=sequoia
+                 cmake -DCMAKE_INSTALL_PREFIX=/
              else
                  cd rpm-build
              fi
@@ -167,7 +163,7 @@ jobs:
 
              echo "::group::make check"
              cd tests
-             if ! make check TESTSUITEFLAGS="-k OpenPGP -k signature -k rpmkeys -k digest"
+             if ! make check TESTOPTS="-k OpenPGP -k signature -k rpmkeys -k digest"
              then
                  echo "::endgroup::"
 
