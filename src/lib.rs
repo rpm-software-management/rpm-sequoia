@@ -845,7 +845,7 @@ fn pgp_verify_signature(key: Option<&PgpDigParams>,
             legacy = true;
             add_lint!(
                 Some(err),
-                "Certificiate {} invalid: certificate is not alive",
+                "Certificate {} invalid: certificate is not alive",
                 vc.keyid());
         }
         if let RevocationStatus::Revoked(_) = vc.revocation_status() {
