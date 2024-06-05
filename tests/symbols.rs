@@ -39,6 +39,7 @@ fn symbols() -> anyhow::Result<()> {
     for line in output.split("\n") {
         if line.contains("g    DF .text")
             || line.contains("g    DO .data")
+            || line.contains("g    DF .opd")
         {
             let symbol = line.split(' ').last().expect("a word");
             symbols.push(symbol);
