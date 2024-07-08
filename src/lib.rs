@@ -122,6 +122,7 @@ use openpgp::policy::{
     StandardPolicy,
     Policy,
 };
+use openpgp::serialize::SerializeInto;
 use openpgp::types::RevocationStatus;
 
 #[macro_use] mod log;
@@ -2238,3 +2239,165 @@ fn _pgpVerifySig(dig: *const PgpDig,
             ctx).into())
 });
 
+ffi!(
+/// Merge the PGP packets of two certificates
+/// 
+/// The certificates must describe the same public key. The call should merge
+/// important pgp packets (self-signatures, new subkeys, ...) and remove duplicates.
+/// 
+/// @param pkts1		OpenPGP pointer to a buffer with the first certificate
+/// @param pkts1len	length of the buffer with the first certificate
+/// @param pkts2		OpenPGP pointer to a buffer with the second certificate
+/// @param pkts2len	length of the buffer with the second certificate
+/// @param pktsm         [out] merged certificate (malloced)
+/// @param pktsmlen      [out] length of merged certificate
+/// @param flags		merge flags (currently not used, must be zero)
+/// @return 		RPMRC_OK on success 
+fn _pgpPubkeyMerge(
+    pkts1: *const u8, pkts1len: size_t,
+    pkts2: *const u8, pkts2len: size_t,
+    pktsm: *mut *mut u8, pktsmlen: *mut size_t,
+    flags: c_int)
+  -> ErrorCode
+{
+    let pkts1 = check_slice!(pkts1, pkts1len);
+    let pkts2 = check_slice!(pkts2, pkts2len);
+
+    let cert1 = Cert::from_bytes(pkts1)?;
+    let cert2 = Cert::from_bytes(pkts2)?;
+
+    if cert1.fingerprint() != cert2.fingerprint() {
+	return Err(Error::Fail("Can't merge different certificates".into()));
+    }
+
+    let (merged, updated)
+	= cert1.clone().insert_packets2(cert2.into_packets2())?;
+
+    let merged_bytes_;
+    let (result, result_len) = if ! updated {
+	// The certificate is unchanged.  Nevertheless,
+	// Cert::from_bytes may have changed the bit representation,
+	// e.g., by canonicalizing it.  To avoid making rpm think that
+	// the certificate has changed when it hasn't (it does a
+	// memcmp), we return pkts1.
+	(pkts1.as_ptr(), pkts1len)
+    } else {
+	merged_bytes_ = merged.to_vec()?;
+	(merged_bytes_.as_ptr(), merged_bytes_.len())
+    };
+
+    unsafe {
+	let buffer = libc::malloc(result_len);
+	libc::memcpy(buffer, result as *const c_void, result_len);
+
+	*pktsmlen = result_len as size_t;
+	*pktsm = buffer as *mut u8;
+    }
+
+    Ok(())
+});
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use openpgp::cert::CertBuilder;
+    use openpgp::serialize::SerializeInto;
+    use openpgp::types::KeyFlags;
+
+    // Check that we can successfully merge two certificates.
+    #[test]
+    fn merge_certs() {
+	let p = openpgp::policy::StandardPolicy::new();
+
+	let (cert, _rev) = CertBuilder::new()
+	    .add_userid("Alice")
+	    .generate()
+	    .unwrap();
+
+	let vc = cert.with_policy(&p, None).unwrap();
+
+	// We should only have a primary, which is certification capable.
+	assert_eq!(vc.keys().for_signing().count(), 0);
+	assert_eq!(vc.keys().for_transport_encryption().count(), 0);
+	assert_eq!(vc.keys().for_storage_encryption().count(), 0);
+
+	// Add a signing subkey.
+	let cert2 = KeyBuilder::new(
+	    KeyFlags::empty().set_signing())
+	    .subkey(vc.clone()).unwrap()
+	    .attach_cert().unwrap();
+
+	// Add an encryption subkey.
+	let cert3 = KeyBuilder::new(
+	    KeyFlags::empty().set_transport_encryption())
+	    .subkey(vc.clone()).unwrap()
+	    .attach_cert().unwrap();
+
+	let cert2_bytes = cert2.to_vec().unwrap();
+	let cert3_bytes = cert3.to_vec().unwrap();
+
+	let mut result: *mut u8 = std::ptr::null_mut();
+	let mut result_len: size_t = 0;
+
+	eprintln!("About to run pgpPubkeyMerge");
+	let ec = _pgpPubkeyMerge(
+	    cert2_bytes.as_ptr(), cert2_bytes.len(),
+	    cert3_bytes.as_ptr(), cert3_bytes.len(),
+	    &mut result, &mut result_len,
+	    0);
+
+	assert_eq!(ec, 0);
+
+	assert!(! result.is_null());
+        let result = unsafe {
+	    std::slice::from_raw_parts(result as *const u8, result_len)
+	};
+
+	let result = Cert::from_bytes(result).expect("valid cert");
+
+	assert_eq!(cert.fingerprint(), result.fingerprint());
+	assert!(result != cert);
+	assert!(result != cert2);
+	assert!(result != cert3);
+
+	let expected = cert2.clone().merge_public(cert3.clone()).unwrap();
+	assert_eq!(result, expected);
+
+	let result_vc = result.with_policy(&p, None).unwrap();
+
+	assert_eq!(result_vc.keys().for_signing().count(), 1);
+	assert_eq!(result_vc.keys().for_transport_encryption().count(), 1);
+	assert_eq!(result_vc.keys().for_storage_encryption().count(), 0);
+    }
+
+    // Check that when we attempt to merge two different certificates,
+    // we return an error.
+    #[test]
+    fn merge_certs_mismatch() {
+	let (cert, _rev) = CertBuilder::new()
+	    .add_userid("Alice")
+	    .generate()
+	    .unwrap();
+	let (cert2, _rev) = CertBuilder::new()
+	    .add_userid("Bob")
+	    .generate()
+	    .unwrap();
+
+	let cert_bytes = cert.to_vec().unwrap();
+	let cert2_bytes = cert2.to_vec().unwrap();
+
+	let mut result: *mut u8 = std::ptr::null_mut();
+	let mut result_len: size_t = 0;
+
+	eprintln!("About to run pgpPubkeyMerge");
+	let ec = _pgpPubkeyMerge(
+	    cert_bytes.as_ptr(), cert_bytes.len(),
+	    cert2_bytes.as_ptr(), cert2_bytes.len(),
+	    &mut result, &mut result_len,
+	    0);
+
+	assert_ne!(ec, 0);
+    }
+}
