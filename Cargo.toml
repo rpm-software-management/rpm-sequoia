@@ -22,7 +22,7 @@ buffered-reader = { version = "1", default-features = false }
 chrono = { version = "0.4", default-features = false, features = [ "std" ] }
 lazy_static = "1"
 libc = "0.2"
-sequoia-openpgp = { version = "1.16", default-features = false }
+sequoia-openpgp = { version = "1.21.1", default-features = false }
 sequoia-policy-config = "0.6"
 thiserror = "1"
 
