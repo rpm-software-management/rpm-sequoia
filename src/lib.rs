@@ -95,8 +95,6 @@ use libc::{
 
 use chrono::{
     DateTime,
-    NaiveDateTime,
-    TimeZone,
     Utc,
 };
 
@@ -1995,12 +1993,11 @@ fn dump_packets(pkts: &[u8]) -> Result<()> {
                     // treats it as an absolute time.  As we're going
                     // for bug-for-bug compatibility here, we do the
                     // same.
-                    let t = NaiveDateTime::from_timestamp_opt(
+                    let t = DateTime::from_timestamp(
                         d.as_secs() as i64, 0)
                         // This is just compatibility, debugging
                         // output.  Fallback to the unix epoch.
                         .unwrap_or_default();
-                    let t = Utc::from_utc_datetime(&Utc, &t);
                     output.push(format!("  {}(0x{:08x})",
                                         t.format("%c"),
                                         d.as_secs()));
