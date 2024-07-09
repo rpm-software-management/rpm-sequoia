@@ -54,10 +54,12 @@
 //! # Configuration File
 //!
 //! This library reads the [crypto policy configuration] in
-//! `/etc/crypto-policies/back-ends/sequoia.config`.  This can be
-//! overridden using the `SEQUOIA_CRYPTO_POLICY` environment variable.
-//! If set to the empty string, then no crypto policy will be read and
-//! instead [Sequoia's default policy] will be used.
+//! `/etc/crypto-policies/back-ends/sequoia.config`.  If that file
+//! doesn't exist, it tries
+//! `/usr/share/crypto-policies/back-ends/rpm-sequoia.config`.  This
+//! can be overridden using the `SEQUOIA_CRYPTO_POLICY` environment
+//! variable.  If set to the empty string, then no crypto policy will
+//! be read and instead [Sequoia's default policy] will be used.
 //!
 //! Refer to the [Fedora Crypto Policy] project for information about
 //! the crypto policy.
