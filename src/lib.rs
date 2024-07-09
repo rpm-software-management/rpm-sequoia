@@ -72,6 +72,7 @@ use std::ffi::{
 use std::fmt::Debug;
 use std::io::Read;
 use std::io::Write;
+use std::path::PathBuf;
 use std::sync::RwLock;
 use std::time::{
     Duration,
@@ -228,8 +229,10 @@ macro_rules! linter {
 // if that is not present, we fallback to the default configuration.
 const RPM_SEQUOIA_CONFIG_ENV: &'static str
     = "RPM_SEQUOIA_CRYPTO_POLICY";
-const RPM_SEQUOIA_CONFIG: &'static str
-    = "/etc/crypto-policies/back-ends/rpm-sequoia.config";
+const RPM_SEQUOIA_CONFIG: &[&str] = &[
+    "/etc/crypto-policies/back-ends/rpm-sequoia.config",
+    "/usr/share/crypto-policies/back-ends/rpm-sequoia.config",
+];
 
 ffi!(
 /// int rpmInitCrypto(void)
@@ -248,8 +251,18 @@ fn _rpmInitCrypto() -> Binary {
     let mut p = sequoia_policy_config::ConfiguredStandardPolicy
         ::from_policy(p);
 
+    // We can only specify a single file to
+    // `ConfiguredStandardPolicy::parse_config_file`.  We work around
+    // it (for now) by taking the first file that exists.
+    let rpm_sequoia_config = RPM_SEQUOIA_CONFIG
+	.iter()
+	.find(|path| {
+	    PathBuf::from(path).exists()
+	})
+	.unwrap_or(&RPM_SEQUOIA_CONFIG[0]);
+
     match p.parse_config(RPM_SEQUOIA_CONFIG_ENV,
-                         RPM_SEQUOIA_CONFIG)
+                         rpm_sequoia_config)
     {
         Ok(false) => {
             // Fallback to the default configuration.
