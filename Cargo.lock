@@ -1713,9 +1713,9 @@ dependencies = [
 
 [[package]]
 name = "sequoia-policy-config"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "757d45d308f2bd9c0d6fdd640f320998ad24856bdf2890ddd28d3c3b85808274"
+checksum = "617d5f0043e630871080fb5a70317cd4f2b7417d6c21b6be11eda5e75bc2549d"
 dependencies = [
  "anyhow",
  "chrono",
