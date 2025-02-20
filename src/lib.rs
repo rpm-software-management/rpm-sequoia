@@ -143,7 +143,9 @@ pub mod digest;
 lazy_static::lazy_static! {
     static ref P: RwLock<StandardPolicy<'static>> = RwLock::new(StandardPolicy::new());
 }
-const NP: &NullPolicy = &NullPolicy::new();
+const NP: &NullPolicy = unsafe {
+    &NullPolicy::new()
+};
 
 // Set according to the RPM_TRACE environment variable (enabled if
 // non-zero), or if we are built in debug mode.
@@ -439,10 +441,10 @@ fn _pgpDigParamsAlgo(dig: *const PgpDigParams,
     match (algotype, &dig.obj) {
         // pubkey algo.
         (PGPVAL_PUBKEYALGO, PgpDigParamsObj::Cert(cert)) => {
-            Ok(u8::from(cert.primary_key().pk_algo()).into())
+            Ok(u8::from(cert.primary_key().key().pk_algo()).into())
         }
         (PGPVAL_PUBKEYALGO, PgpDigParamsObj::Subkey(_, _)) => {
-            Ok(u8::from(dig.key().expect("valid").pk_algo()).into())
+            Ok(u8::from(dig.key().expect("valid").key().pk_algo()).into())
         }
         (PGPVAL_PUBKEYALGO, PgpDigParamsObj::Signature(sig)) => {
             Ok(u8::from(sig.pk_algo()).into())
@@ -541,10 +543,10 @@ fn _pgpDigParamsVersion(dig: *const PgpDigParams) -> c_int[0] {
     let dig = check_ptr!(dig);
     let version = match &dig.obj {
         PgpDigParamsObj::Cert(cert) => {
-            cert.primary_key().version()
+            cert.primary_key().key().version()
         }
         PgpDigParamsObj::Subkey(_, _) => {
-            dig.key().unwrap().version()
+            dig.key().unwrap().key().version()
         }
         PgpDigParamsObj::Signature(sig) => {
             sig.version()
@@ -568,13 +570,14 @@ fn _pgpDigParamsCreationTime(dig: *const PgpDigParams) -> u32[0] {
     let dig = check_ptr!(dig);
     let t = match &dig.obj {
         PgpDigParamsObj::Cert(cert) => {
-            cert.primary_key().creation_time()
+            cert.primary_key().key().creation_time()
         }
         PgpDigParamsObj::Subkey(cert, fpr) => {
             cert.keys().subkeys()
                 .key_handle(fpr)
                 .next()
                 .expect("subkey missing")
+                .key()
                 .creation_time()
         }
         PgpDigParamsObj::Signature(sig) => {
@@ -664,7 +667,7 @@ fn _pgpVerifySignature2(key: *const PgpDigParams,
                     .and_then(|cert| {
                         cert.userids().next()
                             .map(|userid| {
-                                String::from_utf8_lossy(userid.value()).into_owned()
+                                String::from_utf8_lossy(userid.userid().value()).into_owned()
                             })
                     })
                     .unwrap_or_else(|| {
@@ -809,7 +812,7 @@ fn pgp_verify_signature(key: Option<&PgpDigParams>,
         let cert = key.cert().ok_or_else(|| {
             Error::Fail("key parameter is not a cert".into())
         })?;
-        let subkey = key.key().expect("is a certificate").fingerprint();
+        let subkey = key.key().expect("is a certificate").key().fingerprint();
 
         t!("Checking signature {} using {} with {} / {}",
            sig_id(), sig.hash_algo(),
@@ -875,31 +878,31 @@ fn pgp_verify_signature(key: Option<&PgpDigParams>,
         // Find the key.
         match vc.keys().key_handle(issuer.clone()).next() {
             Some(ka) => {
-                if ka.fingerprint() != subkey {
+                if ka.key().fingerprint() != subkey {
                     return_err!(None,
                                 "Key {} invalid: wrong subkey ({})",
-                                ka.keyid(), subkey);
+                                ka.key().keyid(), subkey);
                 }
                 if ! ka.for_signing() {
                     return_err!(None,
                                 "Key {} invalid: not signing capable",
-                                ka.keyid());
+                                ka.key().keyid());
                 }
                 if let Err(err) = ka.alive() {
                     legacy = true;
                     add_lint!(Some(err),
                               "Key {} invalid: key is not alive",
-                              ka.keyid());
+                              ka.key().keyid());
                 }
                 if let RevocationStatus::Revoked(_) = ka.revocation_status() {
                     legacy = true;
                     add_lint!(None,
                               "Key {} is invalid: key is revoked",
-                              ka.keyid());
+                              ka.key().keyid());
                 }
 
                 // Finally we can verify the signature.
-                sig.clone().verify_hash(&ka, ctx.ctx.clone())?;
+                sig.clone().verify_hash(ka.key(), ctx.ctx.clone())?;
                 if legacy {
                     return Err(Error::NotTrusted(
                         "Verification relies on legacy crypto".into())
@@ -1259,6 +1262,15 @@ fn _pgpPubKeyCertLen(pkts: *const u8, pktslen: size_t,
                    t, start_of_packet);
                 break None;
             }
+
+            t => if t.is_critical() {
+                t!("Encountered a ({:?}) at offset {}, \
+                    which does not belong in a certificate",
+                   t, start_of_packet);
+                break None;
+            } else {
+                // Ignore unknown non-critical packet.
+            },
         }
 
         // Advance to the next packet.
@@ -1449,7 +1461,7 @@ fn pgp_prt_params(pkts: *const u8, pktlen: size_t,
                     vc.primary_userid()
                         .ok()
                         .and_then(|u| {
-                            CString::new(u.value()).ok()
+                            CString::new(u.userid().value()).ok()
                         })
                 } else {
                     None
@@ -1547,7 +1559,7 @@ fn _pgpPrtParamsSubkeys(pkts: *const u8, pktlen: size_t,
         vc.primary_userid()
             .ok()
             .and_then(|u| {
-                CString::new(u.value()).ok()
+                CString::new(u.userid().value()).ok()
             })
     } else {
         None
@@ -1558,15 +1570,15 @@ fn _pgpPrtParamsSubkeys(pkts: *const u8, pktlen: size_t,
     let mut keys: Vec<*mut PgpDigParams> = cert
         .keys().subkeys()
         .map(|ka| {
-            t!("Subkey: {}", ka.keyid());
+            t!("Subkey: {}", ka.key().keyid());
 
             let zeros = [0; 8];
             let mut dig = PgpDigParams {
-                obj: PgpDigParamsObj::Subkey(cert.clone(), ka.fingerprint()),
+                obj: PgpDigParamsObj::Subkey(cert.clone(), ka.key().fingerprint()),
                 signid: zeros,
                 userid: userid.clone(),
             };
-            dig.signid.copy_from_slice(ka.keyid().as_bytes());
+            dig.signid.copy_from_slice(ka.key().keyid().as_bytes());
             move_to_c!(dig)
         })
         .collect();
@@ -1707,7 +1719,7 @@ fn _pgpPubKeyLint(pkts: *const c_char,
 
         let mut have_signing = false;
         for ka in cert.keys() {
-            let keyid = ka.keyid();
+            let keyid = ka.key().keyid();
 
             match ka.with_policy(&*P.read().unwrap(), None) {
                 Err(err) => {
@@ -1761,11 +1773,11 @@ fn _pgpPubKeyLint(pkts: *const c_char,
                         continue;
                     }
 
-                    if ! ka.pk_algo().is_supported() {
+                    if ! ka.key().pk_algo().is_supported() {
                         lint(&format!("Subkey {} is not supported \
                                        (no support for {})",
                                       keyid,
-                                      ka.pk_algo()));
+                                      ka.key().pk_algo()));
                         continue;
                     }
 
@@ -1867,6 +1879,7 @@ fn dump_packets(pkts: &[u8]) -> Result<()> {
 
     fn symalgo(a: SymmetricAlgorithm) -> &'static str {
         use SymmetricAlgorithm::*;
+        #[allow(deprecated)]
         match a {
             Unencrypted => "Plaintext",
             IDEA => "IDEA",
@@ -2032,6 +2045,7 @@ fn dump_packets(pkts: &[u8]) -> Result<()> {
 
         // We only dump what rpm's internal OpenPGP implementation
         // dumps.  Other packets we silently ignore.
+        #[allow(deprecated)]
         match packet {
             Packet::Signature(sig) => {
                 // V4 Signature(2) DSA(17) SHA512(10) Generic certification of a User ID and Public Key(16)
@@ -2109,7 +2123,6 @@ fn dump_packets(pkts: &[u8]) -> Result<()> {
             Packet::SKESK(_skesk) => (),
             Packet::SEIP(_seip) => (),
             Packet::MDC(_mdc) => (),
-            Packet::AED(_aed) => (),
             _ => (),
         }
     }
@@ -2286,7 +2299,7 @@ fn _pgpPubkeyMerge(
     }
 
     let (merged, updated)
-	= cert1.clone().insert_packets2(cert2.into_packets2())?;
+	= cert1.clone().insert_packets(cert2.into_packets())?;
 
     let merged_bytes_;
     let (result, result_len) = if ! updated {

@@ -186,6 +186,7 @@ impl From<Option<armor::Kind>> for PgpArmor {
             Some(SecretKey) => PgpArmor::Seckey, // XXX: PgpArmor::Privkey
             Some(Signature) => PgpArmor::Signature, // XXX: PgpArmor::SignedMessage
             Some(File) => PgpArmor::File,
+            _ => PgpArmor::File, // XXX
         }
     }
 }

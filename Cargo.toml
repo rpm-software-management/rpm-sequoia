@@ -21,8 +21,8 @@ anyhow = "1"
 chrono = { version = "0.4", default-features = false, features = [ "std" ] }
 lazy_static = "1"
 libc = "0.2"
-sequoia-openpgp = { version = "1.21.1", default-features = false }
-sequoia-policy-config = "0.6"
+sequoia-openpgp = { version = "2", default-features = false }
+sequoia-policy-config = "0.8"
 thiserror = "1"
 
 [build-dependencies]

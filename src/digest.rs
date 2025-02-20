@@ -7,15 +7,14 @@ use libc::{
 };
 
 use sequoia_openpgp as openpgp;
-use openpgp::types::HashAlgorithm;
-use openpgp::crypto::hash::Digest;
+use openpgp::crypto::{HashAlgorithm, hash};
 
 use crate::Error;
 use crate::Result;
 
 #[derive(Clone)]
 pub struct DigestContext {
-    pub(crate) ctx: Box<dyn Digest>,
+    pub(crate) ctx: hash::Context,
 }
 
 impl DigestContext {
@@ -51,7 +50,7 @@ fn _rpmDigestInit(hashalgo: c_int, flags: c_int) -> *mut DigestContext {
     }
 
     let ctx = DigestContext {
-        ctx: hashalgo.context()?,
+        ctx: hashalgo.context()?.for_digest(),
     };
 
     Ok(move_to_c!(ctx))
