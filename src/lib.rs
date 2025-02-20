@@ -126,6 +126,8 @@ use openpgp::policy::{
 use openpgp::serialize::SerializeInto;
 use openpgp::types::RevocationStatus;
 
+use openpgp::parse::buffered_reader;
+
 #[macro_use] mod log;
 #[macro_use] mod ffi;
 #[macro_use] pub mod rpm;

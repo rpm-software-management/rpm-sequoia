@@ -18,7 +18,6 @@ maintenance = { status = "actively-developed" }
 
 [dependencies]
 anyhow = "1"
-buffered-reader = { version = "1", default-features = false }
 chrono = { version = "0.4", default-features = false, features = [ "std" ] }
 lazy_static = "1"
 libc = "0.2"
