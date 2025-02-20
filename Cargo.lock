@@ -1122,9 +1122,9 @@ dependencies = [
 
 [[package]]
 name = "nettle-sys"
-version = "2.3.0"
+version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b495053a10a19a80e3a26bf1212e92e29350797b5f5bdc58268c3f3f818e66ec"
+checksum = "61a3f5406064d310d59b1a219d3c5c9a49caf4047b6496032e3f930876488c34"
 dependencies = [
  "bindgen",
  "cc",
