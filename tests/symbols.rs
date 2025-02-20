@@ -8,6 +8,9 @@ use assert_cmd::assert::OutputAssertExt;
 
 #[test]
 fn symbols() -> anyhow::Result<()> {
+    // Make sure the library is built.
+    Command::new("cargo").arg("build").ok()?;
+
     // We want the location of the build directory (e.g.,
     // `/tmp/rpm-sequoia/debug`).
     //
