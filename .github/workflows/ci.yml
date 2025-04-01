@@ -107,7 +107,7 @@ jobs:
         run: cargo build
 
       - name: Setup | rpm Dependencies
-        run: sudo apt install automake autoconf autopoint gettext libtool tar zlib1g-dev libpopt-dev libsqlite0-dev liblua5.4-dev fakechroot libarchive-dev
+        run: sudo apt install automake autoconf autopoint gettext libtool tar zlib1g-dev libpopt-dev libsqlite3-dev liblua5.4-dev fakechroot libarchive-dev libmagic-dev
 
       - name: Setup | Checkout rpm
         uses: actions/checkout@v2
