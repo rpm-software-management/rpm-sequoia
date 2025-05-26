@@ -1979,7 +1979,7 @@ fn dump_packets(pkts: &[u8]) -> Result<()> {
                         algos.iter()
                             .map(|a| {
                                 format!("{}({})",
-                                        a.to_string(),
+                                        a,
                                         Into::<u8>::into(*a))
                             })
                             .collect::<Vec<String>>()
@@ -2056,7 +2056,7 @@ fn dump_packets(pkts: &[u8]) -> Result<()> {
                           sig.version(),
                           pk_algo(sig.pk_algo()),
                           Into::<u8>::into(sig.pk_algo()),
-                          sig.hash_algo().to_string(),
+                          sig.hash_algo(),
                           Into::<u8>::into(sig.hash_algo()),
                           sigtype(sig.typ()),
                           Into::<u8>::into(sig.typ()));

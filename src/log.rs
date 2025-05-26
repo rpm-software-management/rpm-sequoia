@@ -13,7 +13,7 @@ macro_rules! log {
 // The indent level.  It is increased with each call to tracer and
 // decremented when the tracker goes out of scope.
 thread_local! {
-    pub static INDENT_LEVEL: RefCell<usize> = RefCell::new(0);
+    pub static INDENT_LEVEL: RefCell<usize> = const { RefCell::new(0) };
 }
 
 // Like eprintln!, but the first argument is a boolean, which
