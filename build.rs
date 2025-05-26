@@ -122,8 +122,8 @@ fn main() -> Result<(), anyhow::Error> {
         ("LIBDIR".to_string(), libdir.into()),
     ]))?;
 
-    let mut pc = File::create(&pc).expect(
-        &format!("Creating {:?} (CARGO_TARGET_DIR: {:?})",
+    let mut pc = File::create(&pc).unwrap_or_else(
+                 |_| panic!("Creating {:?} (CARGO_TARGET_DIR: {:?})",
                  pc, env::var_os("CARGO_TARGET_DIR")));
     pc.write_all(content.as_bytes())?;
 
@@ -139,8 +139,8 @@ fn main() -> Result<(), anyhow::Error> {
         ("LIBDIR".to_string(), "${prefix}".into()),
     ]))?;
 
-    let mut pc = File::create(&pc).expect(
-        &format!("Creating {:?} (CARGO_TARGET_DIR: {:?})",
+    let mut pc = File::create(&pc).unwrap_or_else(
+                 |_| panic!("Creating {:?} (CARGO_TARGET_DIR: {:?})",
                  pc, env::var_os("CARGO_TARGET_DIR")));
     pc.write_all(content.as_bytes())?;
 
