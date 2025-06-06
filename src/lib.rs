@@ -1709,6 +1709,7 @@ fn _pgpPubKeyLint(pkts: *const c_char,
         lints.push(l.into());
     };
 
+    #[allow(clippy::never_loop)]
     let usable = 'done : loop {
         match cert.with_policy(&*P.read().unwrap(), None) {
             Err(err) => {
