@@ -932,7 +932,7 @@ fn pgp_verify_signature(key: Option<&PgpDigParams>,
 
         // Hash the signature into the context.
         match sig.version() {
-            4 => {
+            4 | 6 => {
                 sig_data.push(sig.version());
                 sig_data.push(sig.typ().into());
                 sig_data.push(sig.pk_algo().into());
