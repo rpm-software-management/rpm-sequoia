@@ -42,7 +42,7 @@ by default.
   [rustc]: https://packages.fedoraproject.org/pkgs/rust/rust/
   [nettle-devel]: https://packages.fedoraproject.org/pkgs/nettle/nettle-devel
 
-Here's how to build rpm-sequoia and a version of rpm that uses it:
+Here's how to build rpm-sequoia and a version of rpm that uses it (before 4.18):
 
 ```
 $ sudo dnf install cargo rustc clang pkg-config nettle-devel
@@ -111,34 +111,22 @@ We also set two environment variables when calling `cargo build`:
   and defaults to `${prefix}/lib`.
 
 
-To run just one or two tests, do something like the following:
-
-Note: when building or running the test suite, it is essential to make
-sure `PKG_CONFIG_PATH` and `LD_LIBRARY_PATH` are set appropriately (as
-in the above transcript).
-
-```
-$ cd /tmp/rpm/rpm/b/tests
-$ export PKG_CONFIG_PATH=/tmp/rpm/rpm-sequoia/target/release
-$ export LD_LIBRARY_PATH=/tmp/rpm/rpm-sequoia/target/release
-$ make populate_testing
-$ T="266 273"; for t in $T; do if ! ../../tests/rpmtests $t; then cat rpmtests.dir/$t/rpmtests.log; fi; done
-```
-
-To get tracing output, set RPM_TRACE to 1:
+The current rpm is using containers to run testsuite.
+To run just one or two tests, the simplest solution is to build
+a container with rpm testsuite, copy rpm-sequoia on top of that
+(for example in another container layer), run ldconfig and then
+run the tests:
 
 ```
-$ cd /tmp/rpm/rpm/b/tests
-$ export PKG_CONFIG_PATH=/tmp/rpm/rpm-sequoia/target/release
-$ export LD_LIBRARY_PATH=/tmp/rpm/rpm-sequoia/target/release
-$ make populate_testing
-$ export RPM_TRACE=1
-$ ../../tests/rpmtests 273
-$ cat rpmtests.dir/273/rpmtests.log
-...
-+pgpDigParamsFree: -> success
-+rpmFreeCrypto: entered
-+rpmFreeCrypto: -> success
-273. rpmsigdig.at:495: 273. rpmsign --addsign (rpmsigdig.at:495): FAILED (rpmsigdig.at:503)
-...
+$ cd /tmp/rpm/rpm/tests
+$ podman build --target full -t rpm-tests -f Dockerfile
+$ podman build -t rpm-tests-sequoia -f ../../tests/Dockerfile ../../
+$ podman run --privileged -it --rm --read-only --tmpfs /tmp -v /tmp/rpm/rpm/:/srv:z  --workdir /srv -e ROOTLESS=1 rpm-tests-sequoia rpmtests -k "openpgp v6 keys and signatures"
+```
+
+To get tracing output, set `RPM_TRACE` to 1. This needs to be passed
+using `--setenv` optionto the specific command in the testsuite, for
+example:
+```
+runroot --setenv RPM_TRACE 1 rpmkeys ...
 ```
