@@ -932,13 +932,18 @@ fn pgp_verify_signature(key: Option<&PgpDigParams>,
 
         // Hash the signature into the context.
         match sig.version() {
-            4 => {
+            4 | 6 => {
                 sig_data.push(sig.version());
                 sig_data.push(sig.typ().into());
                 sig_data.push(sig.pk_algo().into());
                 sig_data.push(sig.hash_algo().into());
 
-                let l = sig.hashed_area().serialized_len() as u16;
+                let l = sig.hashed_area().serialized_len();
+                if sig.version() == 6 {
+                    // The v6 signatures encode the hashed length as 4 bytes
+                    sig_data.push((l >> 24) as u8);
+                    sig_data.push((l >> 16) as u8);
+                }
                 sig_data.push((l >> 8) as u8);
                 sig_data.push((l >> 0) as u8);
 
