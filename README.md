@@ -42,13 +42,11 @@ by default.
   [rustc]: https://packages.fedoraproject.org/pkgs/rust/rust/
   [nettle-devel]: https://packages.fedoraproject.org/pkgs/nettle/nettle-devel
 
-Here's how to build rpm-sequoia and a version of rpm that uses it:
-
 ```
 $ sudo dnf install cargo rustc clang pkg-config nettle-devel
 $ mkdir /tmp/rpm
 $ cd /tmp/rpm
-$ git clone git@github.com:rpm-software-management/rpm-sequoia.git
+$ git clone https://github.com/rpm-software-management/rpm-sequoia.git
 Cloning into 'rpm-sequoia'...
 done.
 $ cd rpm-sequoia
@@ -57,31 +55,7 @@ $ PREFIX=/usr LIBDIR="\${prefix}/lib64" \
     Updating crates.io index
 ...
 test result: ok. ...
-$ cd /tmp/rpm
-$ git clone git@github.com:rpm-software-management/rpm.git
-Cloning into 'rpm'...
-done.
-$ cd rpm
-$ git checkout rpm-4.18.1-release
-Switched to a new branch 'rpm-4.18.1-release'
-$ sudo dnf install automake autoconf gettext-devel libtool tar zlib-devel file-devel libarchive-devel popt-devel sqlite-devel lua-devel fakechroot
-$ autoreconf -fis
-...
-$ mkdir b
-$ cd b
-$ export PKG_CONFIG_PATH=/tmp/rpm/rpm-sequoia/target/release
-$ export LD_LIBRARY_PATH=/tmp/rpm/rpm-sequoia/target/release
-$ ../configure --prefix=/ --with-crypto=sequoia
-$ make
-$ make check
 ```
-
-Note: this builds version 4.18 of `rpm`, which is the current stable
-release of `rpm`.  The current development branch of `rpm` has
-switched to using `cmake` instead of `autoconf`.  Please refer to
-[rpm's `INSTALL`] file for how to build `master`.
-
-  [rpm's `INSTALL`]: https://github.com/rpm-software-management/rpm/blob/master/INSTALL
 
 To use a different cryptographic backend, you need to disable the
 default backend, and select your preferred backend.  For instance, to
@@ -110,35 +84,63 @@ We also set two environment variables when calling `cargo build`:
   metadata. It can be an absolute path or one based on `${prefix}`,
   and defaults to `${prefix}/lib`.
 
+# Testing
 
-To run just one or two tests, do something like the following:
+`rpm-sequoia` has a minimal test suite.  Testing is instead done via
+`rpm`'s test suite.
 
-Note: when building or running the test suite, it is essential to make
-sure `PKG_CONFIG_PATH` and `LD_LIBRARY_PATH` are set appropriately (as
-in the above transcript).
+# rpm 4.20
+
+As of version 4.20, `rpm` uses containers to run its test suite.  The
+simplest solution is to build a container with the `rpm` test suite,
+copy `rpm-sequoia` on top of that (for example in another container
+layer), run `ldconfig`, and then run the tests, like so:
 
 ```
-$ cd /tmp/rpm/rpm/b/tests
+$ cd /tmp/rpm
+$ git clone https://github.com/rpm-software-management/rpm.git
+Cloning into 'rpm'...
+done.
+$ cd rpm/tests
+$ podman build --target full -t rpm-tests -f Dockerfile ..
+$ cd /tmp/rpm/rpm-sequoia
+$ podman build -t rpm-tests-sequoia -f tests/Dockerfile .
+$ podman run --privileged -it --rm --read-only --tmpfs /tmp -v /tmp/rpm/rpm/:/srv:z  --workdir /srv -e ROOTLESS=1 rpm-tests-sequoia rpmtests -k OpenPGP -k signature -k rpmkeys -k digest
+```
+
+To get tracing output, set the `RPM_TRACE` environment variable
+to 1. This can be passed by adding `-e RPM_TRACE=1` to the last
+command, like so:
+
+```
+$ podman run --privileged -it --rm --read-only --tmpfs /tmp -v /tmp/rpm/rpm/:/srv:z  --workdir /srv -e ROOTLESS=1 -e RPM_TRACE=1 rpm-tests-sequoia rpmtests -k OpenPGP -k signature -k rpmkeys -k digest
+```
+
+If a tests fails, its log will be saved to
+`/tmp/rpm/rpm/rpmtests.dir/xxx/rpmtests.log` where `xxx` is the test's
+number.  The entire run's log is saved to `/tmp/rpm/rpm/rpmtests.log`.
+Note: these are exposed to the file system due to how we run `podman`.
+
+# For rpm 4.18
+
+To build and test rpm-sequoia for rpm version 4.18, do:
+
+```
+$ cd /tmp/rpm
+$ git clone git@github.com:rpm-software-management/rpm.git
+Cloning into 'rpm'...
+done.
+$ cd rpm
+$ git checkout rpm-4.18.1-release
+Switched to a new branch 'rpm-4.18.1-release'
+$ sudo dnf install automake autoconf gettext-devel libtool tar zlib-devel file-devel libarchive-devel popt-devel sqlite-devel lua-devel fakechroot
+$ autoreconf -fis
+...
+$ mkdir b
+$ cd b
 $ export PKG_CONFIG_PATH=/tmp/rpm/rpm-sequoia/target/release
 $ export LD_LIBRARY_PATH=/tmp/rpm/rpm-sequoia/target/release
-$ make populate_testing
-$ T="266 273"; for t in $T; do if ! ../../tests/rpmtests $t; then cat rpmtests.dir/$t/rpmtests.log; fi; done
-```
-
-To get tracing output, set RPM_TRACE to 1:
-
-```
-$ cd /tmp/rpm/rpm/b/tests
-$ export PKG_CONFIG_PATH=/tmp/rpm/rpm-sequoia/target/release
-$ export LD_LIBRARY_PATH=/tmp/rpm/rpm-sequoia/target/release
-$ make populate_testing
-$ export RPM_TRACE=1
-$ ../../tests/rpmtests 273
-$ cat rpmtests.dir/273/rpmtests.log
-...
-+pgpDigParamsFree: -> success
-+rpmFreeCrypto: entered
-+rpmFreeCrypto: -> success
-273. rpmsigdig.at:495: 273. rpmsign --addsign (rpmsigdig.at:495): FAILED (rpmsigdig.at:503)
-...
+$ ../configure --prefix=/ --with-crypto=sequoia
+$ make
+$ make check
 ```

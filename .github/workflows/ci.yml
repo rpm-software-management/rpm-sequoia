@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Setup | Checkout rpm-sequoia
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Setup | Dependencies
         run: sudo apt update && sudo apt install codespell
       - name: Codespell
@@ -22,12 +22,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Setup | Checkout rpm-sequoia
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Setup | Build Cache rpm-sequoia
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/bin/
@@ -55,12 +55,12 @@ jobs:
     needs: ["Compile"]
     steps:
       - name: Setup | Checkout rpm-sequoia
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Setup | Build Cache rpm-sequoia
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/bin/
@@ -85,12 +85,12 @@ jobs:
     needs: ["Compile"]
     steps:
       - name: Setup | Checkout rpm-sequoia
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup | Build Cache rpm-sequoia
-        uses: actions/cache@v3
+      - name: Setup | Build Cache Rust dependencies
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/bin/
@@ -107,23 +107,16 @@ jobs:
         run: cargo build
 
       - name: Setup | rpm Dependencies
-        run: sudo apt install automake autoconf autopoint gettext libtool tar zlib1g-dev libpopt-dev libsqlite3-dev liblua5.4-dev fakechroot libarchive-dev libmagic-dev
+        run: |
+          sudo apt install podman
 
       - name: Setup | Checkout rpm
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: rpm-software-management/rpm.git
-          ref: rpm-4.18.x
+          ref: master
           fetch-depth: 1
-          path: rpm-pristine
-
-      - name: Setup | Build Cache rpm
-        uses: actions/cache@v3
-        with:
-          path: |
-            rpm/
-            rpm-build/
-          key: ${{ runner.os }}-rpm-${{ hashFiles('rpm-pristine/.git/HEAD', 'rpm-pristine/.git/refs/heads/master') }}
+          path: rpm
 
       - name: Test | rpm
         run: |
@@ -141,36 +134,22 @@ jobs:
                  exit 1
              fi
 
-             echo "::group::configure"
-
-             # If rpm doesn't exist, then we don't have a cache of an
-             # rpm build.
-             if ! test -e rpm
-             then
-                 cp -a rpm-pristine rpm
-
-                 cd rpm
-                 autoreconf -is
-                 cd ..
-
-                 mkdir -p rpm-build
-                 cd rpm-build
-                 ../rpm/configure --prefix=/ --with-crypto=sequoia
-             else
-                 cd rpm-build
-             fi
-             echo "::endgroup::"
-
-             echo "::group::make"
-             make
-             echo "::endgroup::"
-
              echo "::group::make check"
+             cd rpm
+             RPM_ROOT=$(pwd)
              cd tests
-             if ! make check TESTSUITEFLAGS="-k OpenPGP -k signature -k rpmkeys -k digest"
+             # based on ./mktree.oci build
+             podman build --target full -t rpm-tests -f Dockerfile ..
+             # install rpm-sequoia in the test image
+             podman build -t rpm-tests-sequoia -f ../../tests/Dockerfile ../../
+             # run the tests by overriding librpm-sequoia in the container.
+             if ! podman run --privileged -it --rm --read-only --tmpfs /tmp -v $RPM_ROOT:/srv:z \
+                --workdir /srv -e ROOTLESS=1 rpm-tests-sequoia \
+                rpmtests -k OpenPGP -k signature -k rpmkeys -k digest;
              then
                  echo "::endgroup::"
 
+                 cd ..
                  for log in rpmtests.dir/*/rpmtests.log
                  do
                      echo "::group::$log"
