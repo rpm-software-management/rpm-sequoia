@@ -1,0 +1,12 @@
+diff --git a/tests/rpmbuild.at b/tests/rpmbuild.at
+index 68e63c862..d4166fedb 100644
+--- a/tests/rpmbuild.at
++++ b/tests/rpmbuild.at
+@@ -3887,7 +3887,6 @@ RPMTEST_CLEANUP
+ 
+ RPMTEST_SETUP_RW([file digests sha3])
+ AT_KEYWORDS([build digest])
+-RPMTEST_SKIP_IF([test x$PGP = xsequoia])
+ RPMTEST_CHECK([[
+ runroot rpmbuild -bs --quiet \
+ 		--define "_source_filedigest_algorithm 12" \

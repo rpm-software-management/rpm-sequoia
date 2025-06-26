@@ -136,6 +136,8 @@ jobs:
 
              echo "::group::make check"
              cd rpm
+             # enable sha3 test in rpm testsuite
+             patch -p1 < ../tests/rpm.patch
              RPM_ROOT=$(pwd)
              cd tests
              # based on ./mktree.oci build
