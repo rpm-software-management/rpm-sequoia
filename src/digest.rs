@@ -80,6 +80,8 @@ fn _rpmDigestLength(hashalgo: c_int) -> size_t[0] {
         SHA384 => 48,
         SHA512 => 64,
         SHA224 => 28,
+        SHA3_256 => 32,
+        SHA3_512 => 64,
         _ => 0,
     };
 
