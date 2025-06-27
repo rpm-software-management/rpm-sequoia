@@ -103,6 +103,7 @@ use openpgp::armor;
 use openpgp::Cert;
 use openpgp::cert::prelude::*;
 use openpgp::Fingerprint;
+use openpgp::KeyID;
 use openpgp::packet::key::{
     PublicParts,
 };
@@ -932,7 +933,7 @@ fn pgp_verify_signature(key: Option<&PgpDigParams>,
 
         // Hash the signature into the context.
         match sig.version() {
-            4 => {
+            4 | 6 => {
                 sig_data.push(sig.version());
                 sig_data.push(sig.typ().into());
                 sig_data.push(sig.pk_algo().into());
@@ -1434,7 +1435,7 @@ fn pgp_prt_params(pkts: *const u8, pktlen: size_t,
                  // Unfortunately, the API only allows us to return
                  // one.
                  sig.get_issuers().into_iter().next()
-                     .map(|i| i.as_bytes().to_vec()),
+                     .map(|i| KeyID::from(&i)),
                  None)
             }
             Packet::PublicKey(_) | Packet::SecretKey(_)
@@ -1453,7 +1454,7 @@ fn pgp_prt_params(pkts: *const u8, pktlen: size_t,
                         "Failed to read an OpenPGP certificate"),
                 };
 
-                let keyid = cert.keyid().as_bytes().to_vec();
+                let keyid = cert.keyid().clone();
 
                 let userid = if let Ok(vc)
                     = cert.with_policy(&*P.read().unwrap(), None)
@@ -1499,15 +1500,7 @@ fn pgp_prt_params(pkts: *const u8, pktlen: size_t,
 
     let mut buffer: [u8; 8] = [0; 8];
     if let Some(issuer) = issuer {
-        let issuer = if issuer.len() > buffer.len() {
-            // We've got a fingerprint.  For v4 keys, the last 16
-            // bytes is the key id.
-            &issuer[issuer.len() - buffer.len()..]
-        } else {
-            &issuer[..]
-        };
-
-        for (i, c) in issuer.into_iter().enumerate() {
+        for (i, c) in issuer.as_bytes().into_iter().enumerate() {
             buffer[i] = *c as u8;
         }
     }
