@@ -10,3 +10,73 @@ index 68e63c862..d4166fedb 100644
  RPMTEST_CHECK([[
  runroot rpmbuild -bs --quiet \
  		--define "_source_filedigest_algorithm 12" \
+diff --git a/tests/rpmsigdig.at b/tests/rpmsigdig.at
+index d0154aeec..ec224593d 100644
+--- a/tests/rpmsigdig.at
++++ b/tests/rpmsigdig.at
+@@ -2402,20 +2402,20 @@ runroot rpmsign --addsign --rpmv6 /tmp/hello-2.0-1.x86_64.rpm
+ # In addition, rpm-sequoia 1.8 doesn't handle the v6 trailer so it's BAD
+ # instead of NOKEY.
+ # Header OpenPGP V6 Ed25519/SHA512 signature, key ID 0e00df3ed2d7b65e: BAD
+-#RPMTEST_CHECK([
+-#runroot rpmkeys -Kv /tmp/hello-2.0-1.x86_64.rpm
+-#],
+-#[0],
+-#[/tmp/hello-2.0-1.x86_64.rpm:
+-#    Header OpenPGP V6 Ed25519/SHA512 signature, key ID 6118abe481c41473: NOKEY
+-#    Header OpenPGP RSA signature: NOTFOUND
+-#    Header OpenPGP DSA signature: NOTFOUND
+-#    Header SHA256 digest: OK
+-#    Payload SHA256 digest: OK
+-#    Legacy OpenPGP RSA signature: NOTFOUND
+-#    Legacy OpenPGP DSA signature: NOTFOUND
+-#],
+-#[])
++RPMTEST_CHECK([
++runroot rpmkeys -Kv /tmp/hello-2.0-1.x86_64.rpm
++],
++[1],
++[/tmp/hello-2.0-1.x86_64.rpm:
++    Header OpenPGP V6 Ed25519/SHA512 signature, key ID 6118abe481c41473: NOKEY
++    Header OpenPGP RSA signature: NOTFOUND
++    Header OpenPGP DSA signature: NOTFOUND
++    Header SHA256 digest: OK
++    Payload SHA256 digest: OK
++    Legacy OpenPGP RSA signature: NOTFOUND
++    Legacy OpenPGP DSA signature: NOTFOUND
++],
++[])
+ 
+ RPMTEST_CHECK([
+ runroot rpmkeys --import /data/keys/rpm.org-v6-ed25519-test.asc
+@@ -2433,20 +2433,16 @@ runroot rpmkeys --list 036824f0ac60aed6f1a3256f88190469f6d7255e3d8e41c577233aa03
+ [])
+ 
+ # This is currently failing, see the NOKEY case above
+-#RPMTEST_CHECK([
+-#runroot rpmkeys -Kv /tmp/hello-2.0-1.x86_64.rpm
+-#],
+-#[0],
+-#[/tmp/hello-2.0-1.x86_64.rpm:
+-#    Header OpenPGP V6 Ed25519/SHA512 signature, key fingerprint 036824f0ac60aed6f1a3256f88190469f6d7255e3d8e41c577233aa03e0bb9d3 OK
+-#    Header OpenPGP RSA signature: NOTFOUND
+-#    Header OpenPGP DSA signature: NOTFOUND
+-#    Header SHA256 digest: OK
+-#    Payload SHA256 digest: OK
+-#    Legacy OpenPGP RSA signature: NOTFOUND
+-#    Legacy OpenPGP DSA signature: NOTFOUND
+-#],
+-#[])
++RPMTEST_CHECK([
++runroot rpmkeys -Kv /tmp/hello-2.0-1.x86_64.rpm
++],
++[0],
++[/tmp/hello-2.0-1.x86_64.rpm:
++    Header OpenPGP V6 Ed25519/SHA512 signature, key fingerprint: 036824f0ac60aed6f1a3256f88190469f6d7255e3d8e41c577233aa03e0bb9d3: OK
++    Header SHA256 digest: OK
++    Payload SHA256 digest: OK
++],
++[])
+ 
+ RPMTEST_CHECK([
+ runroot rpmkeys --delete 036824f0ac60aed6f1a3256f88190469f6d7255e3d8e41c577233aa03e0bb9d3
