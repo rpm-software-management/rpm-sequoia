@@ -714,6 +714,22 @@ fn _pgpVerifySignature2(key: *const PgpDigParams,
     r
 });
 
+fn salt_context(ctx: digest::DigestContext,
+                salt: &[u8])
+    -> Result<digest::DigestContext>
+{
+    // initialize new empty one
+    let hashalgo = ctx.algo();
+    let mut newctx = digest::DigestContext::new_algo(hashalgo)?;
+    // feed in the salt
+    newctx.update(salt);
+    // feed in the content of the previous context
+    newctx.update(ctx.data);
+    // continue
+    Ok(newctx)
+}
+
+
 // Verifies the signature.
 //
 // Lints are appended to `lints`.  Note: multiple lints may be added.
@@ -902,8 +918,20 @@ fn pgp_verify_signature(key: Option<&PgpDigParams>,
                               ka.key().keyid());
                 }
 
+                // We need to salt the v6 signature hash context.
+                // For others just clone
+                let new_ctx = if sig.version() == 6 {
+                    if let Some(salt) = sig.salt() {
+                        salt_context(ctx, salt)?.ctx
+                    } else {
+                        return Err(Error::Fail("The OpenPGP v6 signatures need salt.".into()));
+                    }
+                } else {
+                    ctx.ctx.clone()
+                };
+
                 // Finally we can verify the signature.
-                sig.clone().verify_hash(ka.key(), ctx.ctx.clone())?;
+                sig.clone().verify_hash(ka.key(), new_ctx)?;
                 if legacy {
                     return Err(Error::NotTrusted(
                         "Verification relies on legacy crypto".into())
@@ -974,6 +1002,16 @@ fn pgp_verify_signature(key: Option<&PgpDigParams>,
             v => {
                 return Err(Error::Fail(
                     format!("Unsupported signature version: {}", v)));
+            }
+        }
+
+        // The v6 signatures are salted, which needs us to feed the salt
+        // in front of the data RPM alread fed into the context.
+        if sig.version() == 6 {
+            if let Some(salt) = sig.salt() {
+                ctx = salt_context(ctx, salt)?
+            } else {
+                return Err(Error::Fail("The OpenPGP v6 signatures need salt.".into()));
             }
         }
 

@@ -15,19 +15,34 @@ use crate::Result;
 #[derive(Clone)]
 pub struct DigestContext {
     pub(crate) ctx: hash::Context,
+    // v6 signature need to salt the signature so we need to keep the hashed
+    // data along -- its just header anyway.
+    pub(crate) data: Vec<u8>,
 }
 
 impl DigestContext {
+    pub(crate) fn new_algo(hashalgo: HashAlgorithm) -> Result<DigestContext> {
+        Ok(DigestContext {
+            ctx: hashalgo.context()?.for_digest(),
+            data: Vec::new(),
+        })
+    }
+
     pub(crate) fn digest_size(&self) -> usize {
         self.ctx.digest_size()
     }
 
     pub(crate) fn update<T: AsRef<[u8]>>(&mut self, data: T) {
         self.ctx.update(data.as_ref());
+        self.data.extend_from_slice(data.as_ref());
     }
 
     pub(crate) fn digest(&mut self, digest: &mut [u8]) -> Result<()> {
         Ok(self.ctx.digest(digest)?)
+    }
+
+    pub(crate) fn algo(&self) -> HashAlgorithm {
+        self.ctx.algo()
     }
 
     pub(crate) fn into_digest(self) -> Result<Vec<u8>> {
@@ -49,9 +64,7 @@ fn _rpmDigestInit(hashalgo: c_int, flags: c_int) -> *mut DigestContext {
         return Err(Error::Fail(format!("Unsupported flags: {}", flags)));
     }
 
-    let ctx = DigestContext {
-        ctx: hashalgo.context()?.for_digest(),
-    };
+    let ctx = DigestContext::new_algo(hashalgo)?;
 
     Ok(move_to_c!(ctx))
 });
