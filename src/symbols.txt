@@ -23,6 +23,7 @@ _pgpDigParamsSignID
 _pgpDigParamsUserID
 _pgpDigParamsVersion
 _pgpDigParamsCreationTime
+_pgpDigParamsSalt
 _pgpDigParamsFree
 _pgpPubkeyMerge
 _pgpVerifySignature
