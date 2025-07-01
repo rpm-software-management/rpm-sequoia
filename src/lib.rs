@@ -591,6 +591,37 @@ fn _pgpDigParamsCreationTime(dig: *const PgpDigParams) -> u32[0] {
 });
 
 ffi!(
+/// Returns the v6 Signature salt.
+///
+/// The v6 Signatures are salted, which means the salt needs to be
+/// fed into the digest buffer before the actual message, which is
+/// processed already by RPM.
+///
+/// The caller must *not* free the returned buffer.
+fn _pgpDigParamsSalt(dig: *const PgpDigParams,
+                     datap: *mut *const u8,
+                     lenp: *mut size_t) -> ErrorCode {
+    let dig = check_ptr!(dig);
+    let datap = check_mut!(datap);
+    let lenp = check_mut!(lenp);
+
+    let sig = dig.signature().ok_or_else(|| {
+        Error::Fail("sig parameter does not designate a signature".into())
+    })?;
+
+    if let Some(ref salt) = sig.salt() {
+        t!("Salt: {}",
+           salt.iter().map(|v| format!("{:02X}", v)).collect::<String>());
+        *lenp = salt.len() as size_t;
+        *datap = salt.as_ptr();
+        Ok(())
+    } else {
+        Err(Error::Fail("The provided signature does not have any salt".into()))
+    }
+});
+
+
+ffi!(
 /// Verifies the signature.
 ///
 /// If `key` is `NULL`, then this computes the hash and checks it
