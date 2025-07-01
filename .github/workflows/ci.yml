@@ -136,17 +136,19 @@ jobs:
 
              echo "::group::make check"
              cd rpm
-             # enable sha3 test in rpm testsuite
+             # enable new test in rpm testsuite and patch dockerfile
              patch -p1 < ../tests/rpm.patch
              RPM_ROOT=$(pwd)
+             # copy the rpm-sequoia artifacts to rpm directory
+             mkdir sequoia
+             cp ../target/debug/librpm_sequoia.so* sequoia/
+             cp ../target/debug/rpm-sequoia.pc sequoia/
              cd tests
              # based on ./mktree.oci build
-             podman build --target full -t rpm-tests -f Dockerfile ..
-             # install rpm-sequoia in the test image
-             podman build -t rpm-tests-sequoia -f ../../tests/Dockerfile ../../
-             # run the tests by overriding librpm-sequoia in the container.
+             podman build --target full -t rpm-tests -f Dockerfile $RPM_ROOT
+             # run the tests with new sequoia
              if ! podman run --privileged -it --rm --read-only --tmpfs /tmp -v $RPM_ROOT:/srv:z \
-                --workdir /srv -e ROOTLESS=1 rpm-tests-sequoia \
+                --workdir /srv -e ROOTLESS=1 rpm-tests \
                 rpmtests -k OpenPGP -k signature -k rpmkeys -k digest;
              then
                  echo "::endgroup::"

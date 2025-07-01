@@ -80,3 +80,19 @@ index d0154aeec..ec224593d 100644
  
  RPMTEST_CHECK([
  runroot rpmkeys --delete 036824f0ac60aed6f1a3256f88190469f6d7255e3d8e41c577233aa03e0bb9d3
+diff --git a/tests/Dockerfile.fedora b/tests/Dockerfile.fedora
+index 8fc61ba2b..8ad879234 100644
+--- a/tests/Dockerfile.fedora
++++ b/tests/Dockerfile.fedora
+@@ -82,6 +82,10 @@ FROM base AS full
+ 
+ WORKDIR /srv/rpm
+ COPY . .
++COPY /sequoia/librpm_sequoia.so /usr/local/lib64/
++COPY /sequoia/librpm_sequoia.so.1 /usr/local/lib64/
++COPY /sequoia/rpm-sequoia.pc /usr/local/lib64/pkgconfig/
++RUN ldconfig
+ 
+ WORKDIR /srv/build
+ ENV CFLAGS="-Og -g"
+
