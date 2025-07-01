@@ -113,8 +113,8 @@ jobs:
       - name: Setup | Checkout rpm
         uses: actions/checkout@v4
         with:
-          repository: rpm-software-management/rpm.git
-          ref: master
+          repository: pmatilai/rpm.git
+          ref: v6salt
           fetch-depth: 1
           path: rpm
 
