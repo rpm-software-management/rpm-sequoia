@@ -1597,7 +1597,7 @@ dependencies = [
 
 [[package]]
 name = "rpm-sequoia"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
