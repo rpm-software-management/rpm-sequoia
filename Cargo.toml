@@ -10,7 +10,7 @@ keywords = ["cryptography", "openpgp", "pgp", "signing"]
 categories = ["cryptography", "authentication"]
 license = "LGPL-2.0-or-later"
 edition = "2021"
-rust-version = "1.79"
+rust-version = "1.85"
 build = "build.rs"
 
 [badges]

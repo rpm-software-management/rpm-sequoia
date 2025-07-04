@@ -35,7 +35,7 @@ crypto policy.
 
 # Building
 
-To build, you need [rustc] (version 1.73 or later), cargo, and
+To build, you need [rustc] (version 1.85 or later), cargo, and
 [nettle-devel], which is the cryptographic library that Sequoia uses
 by default.
 
