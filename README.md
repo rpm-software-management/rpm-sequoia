@@ -144,3 +144,9 @@ $ ../configure --prefix=/ --with-crypto=sequoia
 $ make
 $ make check
 ```
+
+# Symbols test without Rust toolchain
+
+To run the symbols test binary without having a Rust toolchain installed, set an environment 
+variable called `TEST_DONT_BUILD_LIB` with any value. This of course requires you to build 
+the library before the test would be executed.
