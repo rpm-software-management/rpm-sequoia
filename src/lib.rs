@@ -612,7 +612,7 @@ fn _pgpDigParamsSalt(dig: *const PgpDigParams,
     let lenp = check_mut!(lenp);
 
     let sig = dig.signature().ok_or_else(|| {
-        Error::Fail("sig parameter does not designate a signature".into())
+        Error::Fail("dig parameter does not designate a signature".into())
     })?;
 
     if let Some(salt) = sig.salt() {
