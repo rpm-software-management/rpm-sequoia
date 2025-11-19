@@ -1119,6 +1119,9 @@ fn _pgpPubkeyFingerprint(pkt: *const u8, pktlen: size_t,
         let fpr = fpr.as_bytes();
         unsafe {
             let buffer = libc::malloc(fpr.len());
+            if buffer.is_null() {
+                return Err(Error::Fail("out of memory".into()));
+            }
             libc::memcpy(buffer, fpr.as_ptr() as *const c_void, fpr.len());
             *fprout = buffer as *mut u8;
             *fprlen = fpr.len();
@@ -2352,6 +2355,9 @@ fn _pgpPubkeyMerge(
 
     unsafe {
 	let buffer = libc::malloc(result_len);
+        if buffer.is_null() {
+            return Err(Error::Fail("out of memory".into()));
+        }
 	libc::memcpy(buffer, result as *const c_void, result_len);
 
 	*pktsmlen = result_len as size_t;
