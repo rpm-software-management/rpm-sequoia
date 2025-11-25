@@ -1,3 +1,6 @@
+[resolver]
+incompatible-rust-versions = "fallback"
+
 [target.'cfg(all())']
 # Note: if the RUSTFLAGS environment variable is set, this will be
 # ignored.
