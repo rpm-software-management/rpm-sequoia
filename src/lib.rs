@@ -1030,8 +1030,14 @@ fn pgp_verify_signature(key: Option<&PgpDigParams>,
             t!("digest prefix matches");
         }
 
-        return Err(Error::NoKey(
-            format!("Not provided (issuer: {})", issuer).into()));
+        if legacy {
+            return Err(Error::NotTrusted(
+                "Signature relies on legacy crypto".into())
+                       .into());
+        } else {
+            return Err(Error::NoKey(
+                format!("Not provided (issuer: {})", issuer).into()));
+        }
     }
 }
 
