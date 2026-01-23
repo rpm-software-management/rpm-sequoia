@@ -1726,6 +1726,9 @@ fn _pgpPubKeyLint(pkts: *const c_char,
     let pkts = check_slice!(pkts, pktslen);
     let explanation = check_mut!(explanation);
 
+    // Whether the key relies on legacy cryptography.
+    let mut legacy = false;
+
     // Make sure we always set explanation to something.
     *explanation = std::ptr::null_mut();
 
@@ -1743,6 +1746,11 @@ fn _pgpPubKeyLint(pkts: *const c_char,
             Err(err) => {
                 lint(&format!("Policy rejects {}: {}",
                               cert.keyid(), error_chain_display(&err)));
+                // If the signatures are valid, then assume it failed
+                // due to the use of legacy cryptography.
+                if let Ok(_) = cert.with_policy(NP, None) {
+                    legacy = true;
+                }
                 break 'done false;
             }
             Ok(vc) => {
@@ -1790,6 +1798,11 @@ fn _pgpPubKeyLint(pkts: *const c_char,
                 Err(err) => {
                     lint(&format!("Policy rejects subkey {}: {}",
                                   keyid, error_chain_display(&err)));
+                    // If the signatures are valid, then assume it
+                    // failed due to the use of legacy cryptography.
+                    if let Ok(_) = ka.with_policy(NP, None) {
+                        legacy = true;
+                    }
                     continue;
                 }
                 Ok(ka) => {
@@ -1873,6 +1886,9 @@ fn _pgpPubKeyLint(pkts: *const c_char,
 
     if usable {
         Ok(())
+    } else if legacy {
+        Err(Error::NotTrusted(
+            format!("Certificate {} relies on legacy crypto", cert.keyid())))
     } else {
         Err(Error::Fail(format!("Certificate {} is unusable", cert.keyid())))
     }
