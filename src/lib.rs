@@ -1683,7 +1683,7 @@ fn _pgpParsePkts(armor: *const c_char,
 ffi!(
 /// Lints the first certificate in pkts.
 ///
-/// This function links the certificate according to the current
+/// This function lints the certificate according to the current
 /// [policy].  It warns about things like unusable subkeys, because they
 /// do not have a valid binding signature.  It will also generate a
 /// warning if there are no valid, signing-capable keys.
