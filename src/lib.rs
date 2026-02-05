@@ -1030,7 +1030,12 @@ fn pgp_verify_signature(key: Option<&PgpDigParams>,
             t!("digest prefix matches");
         }
 
-        if legacy {
+        if ! sig.pk_algo().is_supported() {
+            return Err(Error::NotTrusted(
+                format!("Signature relies on unknown or unsupported \
+                         cryptographic algorithm {}",
+                        sig.pk_algo())));
+        } else if legacy {
             return Err(Error::NotTrusted(
                 "Signature relies on legacy crypto".into())
                        .into());
