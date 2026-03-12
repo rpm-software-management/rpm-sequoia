@@ -189,6 +189,10 @@ fn error_chain(err: &anyhow::Error) -> Vec<String> {
     errs
 }
 
+fn error_chain_display(err: &anyhow::Error) -> String {
+    error_chain(err).join(", because ")
+}
+
 // Generate macros for working with lints.
 //
 // Note: $dollar is a hack, which we use because nested macros with
@@ -1727,7 +1731,8 @@ fn _pgpPubKeyLint(pkts: *const c_char,
     let usable = 'done : loop {
         match cert.with_policy(&*P.read().unwrap(), None) {
             Err(err) => {
-                lint(&format!("Policy rejects {}: {}", cert.keyid(), err));
+                lint(&format!("Policy rejects {}: {}",
+                              cert.keyid(), error_chain_display(&err)));
                 break 'done false;
             }
             Ok(vc) => {
@@ -1757,10 +1762,10 @@ fn _pgpPubKeyLint(pkts: *const c_char,
                     if let Some(e) = vc.primary_key().key_expiration_time() {
                         if e <= SystemTime::now() {
                             lint(&format!("The certificate is expired: {}",
-                                          err));
+                                          error_chain_display(&err)));
                         } else {
                             lint(&format!("The certificate is not live: {}",
-                                          err));
+                                          error_chain_display(&err)));
                         }
                     }
                 }
@@ -1774,7 +1779,7 @@ fn _pgpPubKeyLint(pkts: *const c_char,
             match ka.with_policy(&*P.read().unwrap(), None) {
                 Err(err) => {
                     lint(&format!("Policy rejects subkey {}: {}",
-                                  keyid, err));
+                                  keyid, error_chain_display(&err)));
                     continue;
                 }
                 Ok(ka) => {
@@ -1814,10 +1819,10 @@ fn _pgpPubKeyLint(pkts: *const c_char,
                         if let Some(e) = ka.key_expiration_time() {
                             if e <= SystemTime::now() {
                                 lint(&format!("Subkey {} is expired: {}",
-                                              keyid, err));
+                                              keyid, error_chain_display(&err)));
                             } else {
                                 lint(&format!("Subkey {} is not live: {}",
-                                              keyid, err));
+                                              keyid, error_chain_display(&err)));
                             }
                         }
                         continue;
