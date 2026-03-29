@@ -20,7 +20,8 @@ fn symbols() -> anyhow::Result<()> {
     // OUT_DIR gives us
     // `/tmp/rpm-sequoia/debug/build/rpm-sequoia-HASH/out`.
 
-    let out_dir = PathBuf::from(env!("OUT_DIR"));
+    let out_dir = PathBuf::from(option_env!("FORCE_RUNTIME_PATH_LIB")
+        .unwrap_or(env!("OUT_DIR")));
     let mut build_dir = out_dir;
     let lib = loop {
         let mut lib = build_dir.clone();
@@ -59,7 +60,8 @@ fn symbols() -> anyhow::Result<()> {
     }
 
     let mut expected_symbols_txt_fn
-        = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        = PathBuf::from(option_env!("FORCE_RUNTIME_PATH_SRC")
+            .unwrap_or(env!("CARGO_MANIFEST_DIR")));
     expected_symbols_txt_fn.push("src/symbols.txt");
 
     let mut expected_symbols_txt = Vec::new();
