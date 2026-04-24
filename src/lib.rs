@@ -989,7 +989,10 @@ fn pgp_verify_signature(key: Option<&PgpDigParams>,
                 sig_data.push((l >> 8) as u8);
                 sig_data.push((l >> 0) as u8);
 
-                sig.hashed_area().serialize(&mut sig_data).expect("vec");
+                if let Err(err) = sig.hashed_area().serialize(&mut sig_data) {
+                    return Err(Error::Fail(
+                        format!("Hashing signature data: {}", err)));
+                }
 
                 let sig_len = sig_data.len();
 
