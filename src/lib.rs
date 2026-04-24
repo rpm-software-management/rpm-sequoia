@@ -1559,9 +1559,16 @@ fn pgp_prt_params(pkts: *const u8, pktlen: size_t,
     };
 
     let mut buffer: [u8; 8] = [0; 8];
-    if let Some(issuer) = issuer {
-        for (i, c) in issuer.as_bytes().into_iter().enumerate() {
-            buffer[i] = *c as u8;
+    match issuer {
+        Some(KeyID::Long(issuer)) => {
+            assert_eq!(buffer.len(), issuer.len());
+            buffer.copy_from_slice(&issuer);
+        }
+        issuer => {
+            return_err!(
+                None,
+                "Signature contains an invalid issuer packet: {:?}",
+                issuer);
         }
     }
 
