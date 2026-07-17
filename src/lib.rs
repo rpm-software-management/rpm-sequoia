@@ -140,6 +140,8 @@ use rpm::{
     Result,
 };
 pub mod digest;
+mod policy;
+use policy::policy_check_signature;
 
 lazy_static::lazy_static! {
     static ref P: RwLock<StandardPolicy<'static>> = RwLock::new(StandardPolicy::new());
@@ -962,7 +964,13 @@ fn pgp_verify_signature(key: Option<&PgpDigParams>,
         }
     } else {
         // We don't have a key, but we still check that the prefix is
-        // correct.
+        // correct and the inferred algorithm is allowed by policy.
+        let policy = P.read().unwrap();
+        if let Err(err) = policy_check_signature(&*policy, sig_time, sig) {
+            return Err(Error::NotTrusted(
+                format!("Signature relies on legacy crypto: {}",
+                        err)));
+        }
 
         // These traits should be imported only where needed to avoid
         // bugs.
