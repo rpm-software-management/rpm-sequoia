@@ -21,7 +21,7 @@ anyhow = "1"
 chrono = { version = "0.4", default-features = false, features = [ "std" ] }
 lazy_static = "1"
 libc = "0.2"
-sequoia-openpgp = { version = "2", default-features = false }
+sequoia-openpgp = { version = "2.4", default-features = false }
 sequoia-policy-config = "0.8"
 thiserror = { version = ">=1, <3" }
 
