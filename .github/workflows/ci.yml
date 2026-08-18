@@ -113,8 +113,8 @@ jobs:
       - name: Setup | Checkout rpm
         uses: actions/checkout@v4
         with:
-          repository: rpm-software-management/rpm.git
-          ref: master
+          repository: Jakuje/rpm.git
+          ref: tests-untrusted-nokey-wip
           fetch-depth: 1
           path: rpm
 
