@@ -104,7 +104,7 @@ jobs:
         run: sudo apt update && sudo apt install cargo clang git nettle-dev pkg-config libssl-dev
 
       - name: Build | Compile rpm-sequoia
-        run: cargo build
+        run: cargo build --no-default-features --features crypto-openssl
 
       - name: Setup | rpm Dependencies
         run: |
