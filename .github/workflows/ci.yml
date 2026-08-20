@@ -71,10 +71,10 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Setup | Dependencies rpm-sequoia
-        run: sudo apt update && sudo apt install cargo clang git nettle-dev pkg-config libssl-dev
+        run: sudo apt update && sudo apt install cargo clang git pkg-config libssl-dev
 
       - name: Build | Compile rpm-sequoia
-        run: cargo build
+        run: cargo build --no-default-features --features sequoia-openpgp/crypto-openssl
 
       - name: Build | Test other commits
         run: .ci/all_commits.sh
@@ -101,10 +101,10 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Setup | Dependencies rpm-sequoia
-        run: sudo apt update && sudo apt install cargo clang git nettle-dev pkg-config libssl-dev
+        run: sudo apt update && sudo apt install cargo clang git pkg-config libssl-dev
 
       - name: Build | Compile rpm-sequoia
-        run: cargo build
+        run: cargo build --no-default-features --features sequoia-openpgp/crypto-openssl
 
       - name: Setup | rpm Dependencies
         run: |
