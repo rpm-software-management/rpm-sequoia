@@ -90,27 +90,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup | Build Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Setup | Dependencies rpm-sequoia
-        run: sudo apt update && sudo apt install cargo clang git nettle-dev pkg-config libssl-dev
-
-      - name: Build | Compile rpm-sequoia
-        run: cargo build --no-default-features --features crypto-openssl
-
-      - name: Setup | rpm Dependencies
-        run: |
-          sudo apt install podman
-
       - name: Setup | Checkout rpm
         uses: actions/checkout@v4
         with:
@@ -118,6 +97,25 @@ jobs:
           ref: master
           fetch-depth: 1
           path: rpm
+
+      - name: Setup | rpm Dependencies
+        run: sudo apt install podman
+
+      - name: Setup | Build Custom Fedora Builder
+        run: podman build -t rpm-builder -f tests/Dockerfile.builder .
+
+      - name: Build | Compile rpm-sequoia in Fedora container
+        run: |
+             # We mount the workspace so the compiled artifacts end up
+             # in target/debug on the host.  --userns=keep-id ensures
+             # file permissions match the GitHub runner user (so
+             # caching works).
+             podman run --rm \
+               -v ${{ github.workspace }}:/workspace:z \
+               -w /workspace \
+               --userns=keep-id \
+               rpm-builder \
+               cargo build --no-default-features --features crypto-openssl
 
       - name: Test | rpm
         run: |
