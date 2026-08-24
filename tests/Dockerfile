@@ -6,3 +6,5 @@ COPY /target/debug/librpm_sequoia.so /usr/local/lib64/librpm_sequoia.so.1
 RUN ln -s librpm_sequoia.so.1 /usr/local/lib64/librpm_sequoia.so
 RUN ls -l /usr/local/lib64/librpm_sequoia*
 RUN ldconfig
+RUN ldd /usr/local/lib64/librpm_sequoia.so.1
+RUN cat /etc/crypto-policies/back-ends/rpm-sequoia.config
