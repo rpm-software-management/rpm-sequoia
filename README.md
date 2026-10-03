@@ -150,3 +150,11 @@ $ make check
 To run the symbols test binary without having a Rust toolchain installed, set an environment 
 variable called `TEST_DONT_BUILD_LIB` with any value. This of course requires you to build 
 the library before the test would be executed.
+
+# Cross Compiling
+
+In a cross-compilation context (e.g., Yocto), Cargo's default paths
+(`OUT_DIR` and `CARGO_MANIFEST_DIR`) may not be valid when the test
+suite is run.  To run the test suite anyway, you can set
+`FORCE_RUNTIME_PATH_LIB` and `FORCE_RUNTIME_PATH_SRC` to override
+these paths.
