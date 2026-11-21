@@ -15,40 +15,10 @@
 
 [advisories]
 ignore = [
-  # These are due to sequoia-tpm's dependency on structopt.
-  # sequoia-keystore crate actually use those.  So we're fine.  Remove
-  # these once sequoia-tpm no longer users structopt.
-  "RUSTSEC-2021-0139",
-  "RUSTSEC-2021-0145",
-
   #  Unfixable (as of rsa 0.9.6) marvin attack.
   "RUSTSEC-2023-0071",
 
-  "RUSTSEC-2020-0159",
-  "RUSTSEC-2020-0071", # chrono not affected by time 0.1 issue
-  # fehler is unmaintained.
-  #
-  # fehler is used by subplot and thus an indirect dependency.  Remove
-  # when a new version subplot is released without fehler.  See
-  # https://gitlab.com/subplot/subplot/-/issues/340.
-  "RUSTSEC-2023-0067",
 
-  # yaml-rust is unmaintained.
-  #
-  # yaml-rust is used by subplot/roadmap/serde_yaml thus an indirect
-  # dependency.  Remove when a new version of roadmap is released that
-  # uses a newer version of serde_yaml.  See
-  # https://gitlab.com/larswirzenius/roadmap/-/issues/13
-  "RUSTSEC-2024-0320",
-
-  # instant is unmaintained.
-  #
-  # instant is used by indicatif and thus an indirect dependency.
-  # Remove when a new version of indicatif is released that drops the
-  # dependency.
-  "RUSTSEC-2024-0384",
-  # paste is unmaintained as of 2025-03-07
-  "RUSTSEC-2024-0436",
 
   # humantime is unmaintained.
   "RUSTSEC-2025-0014",
